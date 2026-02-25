@@ -55,8 +55,18 @@ def create_app(config_name=None):
     # Enregistrer les blueprints
     _register_blueprints(app)
     
-    # Créer les tables (uniquement si pas en production ou sur demande)
-    # SUPPRIMÉ : db.create_all() au démarrage - utilise flask init-db à la place
+    # CRUCIAL : Créer les tables au premier démarrage (Render Free)
+    with app.app_context():
+        try:
+            # Vérifie si la table users existe
+            from app.models import User
+            User.query.first()
+        except Exception:
+            # Table n'existe pas, on crée tout
+            print("🔧 Première initialisation de la base de données...")
+            db.create_all()
+            _create_initial_data()
+            print("✅ Base de données initialisée avec succès !")
     
     return app
 
@@ -88,14 +98,11 @@ def _register_blueprints(app):
     app.register_blueprint(reports_bp, url_prefix='/reports')
 
 
-def init_db_command():
-    """Commande pour initialiser la base de données"""
+def _create_initial_data():
+    """Créer les données initiales si elles n'existent pas"""
     from app.models import User, Referent, Product, Campaign
     from werkzeug.security import generate_password_hash
     from datetime import date
-    
-    db.create_all()
-    print("✅ Tables créées")
     
     # Créer l'admin s'il n'existe pas
     if not User.query.filter_by(username='admin').first():
