@@ -2,6 +2,7 @@
 """
 Dermo-CRM - Application Factory
 """
+import os
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
@@ -23,15 +24,19 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 
-def create_app(config_name='default'):
+def create_app(config_name=None):
     """
-    Factory pattern pour creer l'application Flask
+    Factory pattern pour créer l'application Flask
     """
     app = Flask(__name__, 
                 template_folder='templates',
                 static_folder='static')
     
-    # Import ici pour eviter le conflit circulaire
+    # Déterminer la config
+    if config_name is None:
+        config_name = os.getenv('FLASK_CONFIG', 'production')
+    
+    # Import ici pour éviter le conflit circulaire
     from config import config_dict
     app.config.from_object(config_dict[config_name])
     
@@ -44,10 +49,20 @@ def create_app(config_name='default'):
     
     # Configuration LoginManager
     login_manager.login_view = 'auth.login'
-    login_manager.login_message = 'Veuillez vous connecter pour acceder a cette page.'
+    login_manager.login_message = 'Veuillez vous connecter pour accéder à cette page.'
     login_manager.login_message_category = 'warning'
     
     # Enregistrer les blueprints
+    _register_blueprints(app)
+    
+    # Créer les tables (uniquement si pas en production ou sur demande)
+    # SUPPRIMÉ : db.create_all() au démarrage - utilise flask init-db à la place
+    
+    return app
+
+
+def _register_blueprints(app):
+    """Enregistrer tous les blueprints"""
     from app.routes.auth import bp as auth_bp
     app.register_blueprint(auth_bp, url_prefix='/auth')
     
@@ -71,21 +86,18 @@ def create_app(config_name='default'):
     
     from app.routes.reports import bp as reports_bp
     app.register_blueprint(reports_bp, url_prefix='/reports')
-    
-    # Creer les tables et donnees initiales
-    with app.app_context():
-        db.create_all()
-        _create_initial_data()
-    
-    return app
 
 
-def _create_initial_data():
-    """Creer les donnees initiales si elles n'existent pas"""
+def init_db_command():
+    """Commande pour initialiser la base de données"""
     from app.models import User, Referent, Product, Campaign
     from werkzeug.security import generate_password_hash
+    from datetime import date
     
-    # Creer l'admin s'il n'existe pas
+    db.create_all()
+    print("✅ Tables créées")
+    
+    # Créer l'admin s'il n'existe pas
     if not User.query.filter_by(username='admin').first():
         admin = User(
             username='admin',
@@ -97,9 +109,9 @@ def _create_initial_data():
         )
         db.session.add(admin)
         db.session.commit()
-        print("OK - Utilisateur admin cree (admin / admin123)")
+        print("✅ Utilisateur admin créé (admin / admin123)")
     
-    # Creer des referents exemples
+    # Créer des référents exemples
     if not Referent.query.first():
         referents = [
             Referent(name='Marie Dupont', email='marie.dupont@email.com', 
@@ -111,30 +123,29 @@ def _create_initial_data():
         ]
         db.session.add_all(referents)
         db.session.commit()
-        print("OK - Referents exemples crees")
+        print("✅ Référents exemples créés")
     
-    # Creer des produits exemples
+    # Créer des produits exemples
     if not Product.query.first():
         products = [
-            Product(name='Creme Hydratante Ultra', brand='Dermophil', 
+            Product(name='Crème Hydratante Ultra', brand='Dermophil', 
                    category='Hydratation', 
-                   description='Creme hydratante pour peaux sensibles'),
-            Product(name='Serum Anti-Age', brand='SkinScience', 
-                   category='Anti-Age', 
-                   description='Serum concentre au retinol'),
+                   description='Crème hydratante pour peaux sensibles'),
+            Product(name='Sérum Anti-Âge', brand='SkinScience', 
+                   category='Anti-Âge', 
+                   description='Sérum concentré au rétinol'),
             Product(name='Protection Solaire SPF50', brand='SunCare', 
                    category='Protection', 
-                   description='Ecran solaire haute protection')
+                   description='Écran solaire haute protection')
         ]
         db.session.add_all(products)
         db.session.commit()
-        print("OK - Produits exemples crees")
+        print("✅ Produits exemples créés")
     
-    # Creer une campagne exemple
+    # Créer une campagne exemple
     if not Campaign.query.first():
-        from datetime import date
         campaign = Campaign(
-            name='Campagne Ete 2024',
+            name='Campagne Été 2024',
             description='Promotion des produits solaires',
             start_date=date(2024, 6, 1),
             end_date=date(2024, 8, 31),
@@ -143,4 +154,4 @@ def _create_initial_data():
         )
         db.session.add(campaign)
         db.session.commit()
-        print("OK - Campagne exemple creee")
+        print("✅ Campagne exemple créée")
