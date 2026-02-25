@@ -1,0 +1,542 @@
+{% extends 'base.html' %}
+
+{% block title %}Carte - Dermo-CRM{% endblock %}
+{% block page_title %}Carte Interactive{% endblock %}
+
+{% block extra_css %}
+<style>
+#map {
+    height: calc(100vh - 200px);
+    min-height: 500px;
+}
+
+.map-filters {
+    background: white;
+    border-radius: 12px;
+    padding: 15px;
+    margin-bottom: 15px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+.map-legend {
+    background: white;
+    border-radius: 8px;
+    padding: 10px 15px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+.legend-color {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+.pharmacy-popup {
+    min-width: 250px;
+}
+
+.pharmacy-popup h6 {
+    margin-bottom: 10px;
+    color: #2c3e50;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 8px;
+}
+
+.popup-actions {
+    margin-top: 15px;
+    padding-top: 10px;
+    border-top: 1px solid #eee;
+}
+
+.custom-marker {
+    border-radius: 50%;
+    border: 3px solid white;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Filtres -->
+<div class="map-filters">
+    <form id="filterForm" class="row g-3 align-items-end">
+        <div class="col-md-3">
+            <label class="form-label">Région</label>
+            <select class="form-select" id="filterRegion">
+                <option value="">Toutes les régions</option>
+                {% for region in regions %}
+                <option value="{{ region }}" {% if region == region_filter %}selected{% endif %}>{{ region }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Référent</label>
+            <select class="form-select" id="filterReferent">
+                <option value="">Tous les référents</option>
+                {% for referent in referents %}
+                <option value="{{ referent.id }}" {% if referent.id == referent_filter %}selected{% endif %}>{{ referent.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Campagne</label>
+            <select class="form-select" id="filterCampaign">
+                <option value="">Toutes les campagnes</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <button type="button" class="btn btn-primary w-100" onclick="applyFilters()">
+                <i class="bi bi-funnel"></i> Filtrer
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Actions rapides -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <button class="btn btn-success btn-sm" onclick="locateMe()">
+            <i class="bi bi-geo"></i> Ma position
+        </button>
+        <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addPharmacyModal">
+            <i class="bi bi-plus-lg"></i> Ajouter une pharmacie
+        </button>
+    </div>
+    <div class="map-legend d-flex gap-3">
+        {% for referent in referents %}
+        <div class="legend-item">
+            <div class="legend-color" style="background: {{ referent.color }}"></div>
+            <small>{{ referent.name }}</small>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Carte -->
+<div id="map"></div>
+
+<!-- Modal Ajout Pharmacie -->
+<div class="modal fade" id="addPharmacyModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-plus-circle"></i> Ajouter une pharmacie</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <ul class="nav nav-tabs" role="tablist">
+                    <li class="nav-item">
+                        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-address">
+                            <i class="bi bi-geo-alt"></i> Par adresse
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-gps">
+                            <i class="bi bi-crosshair"></i> Par GPS
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-map">
+                            <i class="bi bi-map"></i> Sur la carte
+                        </button>
+                    </li>
+                </ul>
+                
+                <div class="tab-content mt-3">
+                    <!-- Par adresse -->
+                    <div class="tab-pane fade show active" id="tab-address">
+                        <form id="addByAddressForm" action="{{ url_for('pharmacies.create') }}" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Nom *</label>
+                                    <input type="text" class="form-control" name="name" required>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Type</label>
+                                    <select class="form-select" name="type">
+                                        <option value="pharmacie">Pharmacie</option>
+                                        <option value="parapharmacie">Parapharmacie</option>
+                                        <option value="grande_surface">Grande surface</option>
+                                        <option value="autre">Autre</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Adresse *</label>
+                                <input type="text" class="form-control" name="address" required>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Code postal</label>
+                                    <input type="text" class="form-control" name="postal_code">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Ville</label>
+                                    <input type="text" class="form-control" name="city">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Région</label>
+                                    <input type="text" class="form-control" name="region">
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Téléphone</label>
+                                    <input type="tel" class="form-control" name="phone">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Email</label>
+                                    <input type="email" class="form-control" name="email">
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Référent</label>
+                                <select class="form-select" name="referent_id">
+                                    <option value="">-- Sélectionner --</option>
+                                    {% for referent in referents %}
+                                    <option value="{{ referent.id }}">{{ referent.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-lg"></i> Créer
+                            </button>
+                        </form>
+                    </div>
+                    
+                    <!-- Par GPS -->
+                    <div class="tab-pane fade" id="tab-gps">
+                        <form id="addByGPSForm" action="{{ url_for('pharmacies.create') }}" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Latitude *</label>
+                                    <input type="number" step="any" class="form-control" name="latitude" id="gpsLat" required>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Longitude *</label>
+                                    <input type="number" step="any" class="form-control" name="longitude" id="gpsLng" required>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-outline-secondary mb-3" onclick="getCurrentPosition()">
+                                <i class="bi bi-geo-fill"></i> Utiliser ma position
+                            </button>
+                            <hr>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Nom *</label>
+                                    <input type="text" class="form-control" name="name" required>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Type</label>
+                                    <select class="form-select" name="type">
+                                        <option value="pharmacie">Pharmacie</option>
+                                        <option value="parapharmacie">Parapharmacie</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-lg"></i> Créer
+                            </button>
+                        </form>
+                    </div>
+                    
+                    <!-- Sur la carte -->
+                    <div class="tab-pane fade" id="tab-map">
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i> Cliquez sur la carte principale pour positionner une nouvelle pharmacie.
+                        </div>
+                        <form id="addByMapForm" action="{{ url_for('pharmacies.create') }}" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="latitude" id="mapLat">
+                            <input type="hidden" name="longitude" id="mapLng">
+                            <div class="mb-3">
+                                <label class="form-label">Coordonnées sélectionnées</label>
+                                <div id="selectedCoords" class="form-control bg-light">Cliquez sur la carte...</div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Nom *</label>
+                                    <input type="text" class="form-control" name="name" required>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Type</label>
+                                    <select class="form-select" name="type">
+                                        <option value="pharmacie">Pharmacie</option>
+                                        <option value="parapharmacie">Parapharmacie</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary" id="btnCreateMap" disabled>
+                                <i class="bi bi-check-lg"></i> Créer
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Détails Pharmacie -->
+<div class="modal fade" id="pharmacyDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="pharmacyDetailTitle">Détails</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="pharmacyDetailContent">
+                Chargement...
+            </div>
+            <div class="modal-footer">
+                <a href="#" class="btn btn-primary" id="pharmacyDetailLink">
+                    <i class="bi bi-eye"></i> Voir la fiche complète
+                </a>
+                <a href="#" class="btn btn-success" id="pharmacyVisitLink">
+                    <i class="bi bi-plus-lg"></i> Nouvelle visite
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Variables globales
+let map;
+let markers = [];
+let tempMarker = null;
+const referents = {{ referents | tojson }};
+
+// Initialisation de la carte
+document.addEventListener('DOMContentLoaded', function() {
+    initMap();
+    loadPharmacies();
+    loadCampaigns();
+});
+
+function initMap() {
+    // Centre sur la France
+    map = L.map('map').setView([46.603354, 1.888334], 6);
+    
+    // Couche OpenStreetMap
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19
+    }).addTo(map);
+    
+    // Gestion du clic sur la carte pour ajout
+    map.on('click', function(e) {
+        document.getElementById('mapLat').value = e.latlng.lat;
+        document.getElementById('mapLng').value = e.latlng.lng;
+        document.getElementById('selectedCoords').textContent = 
+            `Lat: ${e.latlng.lat.toFixed(6)}, Lng: ${e.latlng.lng.toFixed(6)}`;
+        document.getElementById('btnCreateMap').disabled = false;
+        
+        // Marqueur temporaire
+        if (tempMarker) {
+            map.removeLayer(tempMarker);
+        }
+        tempMarker = L.marker(e.latlng).addTo(map);
+        
+        // Ouvrir le modal si pas déjà ouvert
+        const modal = bootstrap.Modal.getInstance(document.getElementById('addPharmacyModal'));
+        if (!modal) {
+            const newModal = new bootstrap.Modal(document.getElementById('addPharmacyModal'));
+            // Activer l'onglet carte
+            const tab = new bootstrap.Tab(document.querySelector('#tab-map'));
+            tab.show();
+            newModal.show();
+        }
+    });
+}
+
+// Charger les pharmacies
+function loadPharmacies() {
+    const region = document.getElementById('filterRegion').value;
+    const referentId = document.getElementById('filterReferent').value;
+    const campaignId = document.getElementById('filterCampaign').value;
+    
+    let url = '/pharmacies/api/pharmacies?';
+    if (region) url += `region=${encodeURIComponent(region)}&`;
+    if (referentId) url += `referent_id=${referentId}&`;
+    if (campaignId) url += `campaign_id=${campaignId}&`;
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(pharmacies => {
+            displayPharmacies(pharmacies);
+        })
+        .catch(error => console.error('Erreur:', error));
+}
+
+// Afficher les pharmacies sur la carte
+function displayPharmacies(pharmacies) {
+    // Supprimer les marqueurs existants
+    markers.forEach(marker => map.removeLayer(marker));
+    markers = [];
+    
+    pharmacies.forEach(pharmacy => {
+        if (!pharmacy.latitude || !pharmacy.longitude) return;
+        
+        const color = pharmacy.referent_color || '#007bff';
+        
+        // Créer un marqueur personnalisé
+        const customIcon = L.divIcon({
+            className: 'custom-marker',
+            html: `<div style="width: 16px; height: 16px; background: ${color}; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"></div>`,
+            iconSize: [16, 16],
+            iconAnchor: [8, 8]
+        });
+        
+        const marker = L.marker([pharmacy.latitude, pharmacy.longitude], { icon: customIcon })
+            .addTo(map)
+            .bindPopup(createPopupContent(pharmacy));
+        
+        marker.pharmacyId = pharmacy.id;
+        markers.push(marker);
+    });
+    
+    // Ajuster la vue si des marqueurs existent
+    if (markers.length > 0) {
+        const group = new L.featureGroup(markers);
+        map.fitBounds(group.getBounds().pad(0.1));
+    }
+}
+
+// Créer le contenu du popup
+function createPopupContent(pharmacy) {
+    const typeLabels = {
+        'pharmacie': 'Pharmacie',
+        'parapharmacie': 'Parapharmacie',
+        'grande_surface': 'Grande surface',
+        'autre': 'Autre'
+    };
+    
+    return `
+        <div class="pharmacy-popup">
+            <h6>${pharmacy.name}</h6>
+            <p><span class="badge badge-${pharmacy.type}">${typeLabels[pharmacy.type] || pharmacy.type}</span></p>
+            <p><i class="bi bi-geo-alt"></i> ${pharmacy.address || ''}, ${pharmacy.city || ''}</p>
+            ${pharmacy.phone ? `<p><i class="bi bi-telephone"></i> ${pharmacy.phone}</p>` : ''}
+            ${pharmacy.referent_name ? `<p><i class="bi bi-person"></i> ${pharmacy.referent_name}</p>` : ''}
+            <div class="popup-actions">
+                <a href="/pharmacies/${pharmacy.id}" class="btn btn-sm btn-primary">
+                    <i class="bi bi-eye"></i> Détails
+                </a>
+                <a href="/visits/create?pharmacy_id=${pharmacy.id}" class="btn btn-sm btn-success">
+                    <i class="bi bi-plus-lg"></i> Visite
+                </a>
+            </div>
+        </div>
+    `;
+}
+
+// Appliquer les filtres
+function applyFilters() {
+    loadPharmacies();
+}
+
+// Localiser l'utilisateur
+function locateMe() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            position => {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                map.setView([lat, lng], 15);
+                L.marker([lat, lng]).addTo(map)
+                    .bindPopup('Votre position')
+                    .openPopup();
+            },
+            error => {
+                alert('Impossible d\'obtenir votre position: ' + error.message);
+            }
+        );
+    } else {
+        alert('La géolocalisation n\'est pas supportée par votre navigateur.');
+    }
+}
+
+// Obtenir la position actuelle pour le formulaire GPS
+function getCurrentPosition() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            position => {
+                document.getElementById('gpsLat').value = position.coords.latitude;
+                document.getElementById('gpsLng').value = position.coords.longitude;
+            },
+            error => {
+                alert('Impossible d\'obtenir votre position');
+            }
+        );
+    }
+}
+
+// Charger les campagnes pour le filtre
+function loadCampaigns() {
+    fetch('/campaigns/api/campaigns')
+        .then(response => response.json())
+        .then(campaigns => {
+            const select = document.getElementById('filterCampaign');
+            campaigns.forEach(campaign => {
+                const option = document.createElement('option');
+                option.value = campaign.id;
+                option.textContent = campaign.name;
+                select.appendChild(option);
+            });
+        })
+        .catch(error => console.error('Erreur:', error));
+}
+
+// Afficher les détails d'une pharmacie dans le modal
+function showPharmacyDetail(pharmacyId) {
+    fetch(`/pharmacies/api/pharmacies/${pharmacyId}`)
+        .then(response => response.json())
+        .then(pharmacy => {
+            document.getElementById('pharmacyDetailTitle').textContent = pharmacy.name;
+            document.getElementById('pharmacyDetailLink').href = `/pharmacies/${pharmacy.id}`;
+            document.getElementById('pharmacyVisitLink').href = `/visits/create?pharmacy_id=${pharmacy.id}`;
+            
+            let content = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>Type:</strong> ${pharmacy.type}</p>
+                        <p><strong>Adresse:</strong> ${pharmacy.address || '-'}, ${pharmacy.city || ''}</p>
+                        <p><strong>Téléphone:</strong> ${pharmacy.phone || '-'}</p>
+                        <p><strong>Email:</strong> ${pharmacy.email || '-'}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Référent:</strong> ${pharmacy.referent_name || '-'}</p>
+                        <p><strong>Nb visites:</strong> ${pharmacy.visit_count}</p>
+                        <p><strong>Dernière visite:</strong> ${pharmacy.last_visit || 'Jamais'}</p>
+                    </div>
+                </div>
+            `;
+            
+            if (pharmacy.contacts && pharmacy.contacts.length > 0) {
+                content += '<h6 class="mt-3">Contacts</h6><ul>';
+                pharmacy.contacts.forEach(contact => {
+                    content += `<li>${contact.name} ${contact.phone ? '(' + contact.phone + ')' : ''}</li>`;
+                });
+                content += '</ul>';
+            }
+            
+            document.getElementById('pharmacyDetailContent').innerHTML = content;
+            
+            const modal = new bootstrap.Modal(document.getElementById('pharmacyDetailModal'));
+            modal.show();
+        });
+}
+</script>
+{% endblock %}

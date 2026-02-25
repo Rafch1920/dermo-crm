@@ -1,0 +1,548 @@
+{% extends "base.html" %}
+
+{% block title %}{{ campaign.name }} - Dermo-CRM{% endblock %}
+{% block page_title %}{{ campaign.name }}{% endblock %}
+
+{% block extra_css %}
+<link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/main.min.css' rel='stylesheet' />
+<style>
+    .status-done { background: #2ecc71 !important; color: white !important; }
+    .status-scheduled { background: #3498db !important; color: white !important; }
+    .status-pending { background: #95a5a6 !important; color: white !important; }
+    .status-problem { background: #e74c3c !important; color: white !important; }
+    .status-cancelled { background: #7f8c8d !important; color: white !important; }
+    
+    .fc-event-done { background-color: #2ecc71 !important; border-color: #2ecc71 !important; }
+    .fc-event-scheduled { background-color: #3498db !important; border-color: #3498db !important; }
+    .fc-event-pending { background-color: #95a5a6 !important; border-color: #95a5a6 !important; }
+    .fc-event-problem { background-color: #e74c3c !important; border-color: #e74c3c !important; }
+    .fc-event-cancelled { background-color: #7f8c8d !important; border-color: #7f8c8d !important; }
+    
+    #map { height: 300px; border-radius: 10px; }
+    #calendar { height: 500px; }
+    .left-panel { max-height: 85vh; overflow-y: auto; }
+    .pharmacy-item { cursor: pointer; transition: all 0.2s; }
+    .pharmacy-item:hover { background-color: #e3f2fd; transform: translateX(5px); }
+    
+    .time-slot { 
+        padding: 15px; 
+        border-left: 4px solid; 
+        margin-bottom: 8px; 
+        background: white; 
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .time-slot:hover { transform: scale(1.02); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .time-slot.done { border-color: #2ecc71; }
+    .time-slot.scheduled { border-color: #3498db; }
+    .time-slot.problem { border-color: #e74c3c; }
+    .time-slot.cancelled { border-color: #7f8c8d; }
+    .time-slot.empty { 
+        border-color: #ddd; 
+        border-style: dashed; 
+        color: #999;
+        cursor: pointer;
+    }
+    .time-slot.empty:hover { 
+        background: #e8f5e9; 
+        border-color: #4caf50;
+        color: #2e7d32;
+    }
+    .time-slot.occupied {
+        background: #ffebee;
+        border-color: #ef5350;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                    <h4>{{ campaign.name }}</h4>
+                    <p class="text-muted mb-0">{{ campaign.description or 'Aucune description' }}</p>
+                    <small class="text-muted">{{ campaign.start_date.strftime('%d/%m/%Y') }} - {{ campaign.end_date.strftime('%d/%m/%Y') }}</small>
+                </div>
+                <div>
+                    <a href="{{ url_for('campaigns.edit', id=campaign.id) }}" class="btn btn-warning btn-sm">
+                        <i class="bi bi-pencil"></i> Modifier
+                    </a>
+                    <a href="{{ url_for('campaigns.index') }}" class="btn btn-secondary btn-sm">Retour</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="d-flex gap-2 flex-wrap">
+            <button class="btn btn-outline-secondary btn-sm" onclick="filterByStatus('all')">Toutes ({{ stats.total }})</button>
+            <button class="btn btn-success btn-sm" onclick="filterByStatus('done')">Fait ({{ stats.done }})</button>
+            <button class="btn btn-primary btn-sm" onclick="filterByStatus('scheduled')">Programme ({{ stats.scheduled }})</button>
+            <button class="btn btn-secondary btn-sm" onclick="filterByStatus('pending')">A faire ({{ stats.pending }})</button>
+            <button class="btn btn-danger btn-sm" onclick="filterByStatus('problem')">Probleme ({{ stats.problem }})</button>
+            <button class="btn btn-dark btn-sm" onclick="filterByStatus('cancelled')">Annule ({{ stats.cancelled }})</button>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4 left-panel">
+        <div class="card mb-3">
+            <div class="card-header bg-primary text-white">
+                <h6 class="mb-0">Pharmacies ({{ stats.total }}) - Cliquez pour modifier</h6>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush" id="pharmaciesList">
+                    {% for link in pharmacy_links %}
+                    <div class="list-group-item pharmacy-item" 
+                         data-status="{{ link.status }}" 
+                         data-link-id="{{ link.id }}"
+                         onclick="showStatusModal({{ link.id }}, '{{ link.status }}', '{{ link.pharmacy_obj.name }}')">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <strong>{{ link.pharmacy_obj.name }}</strong>
+                                <br><small class="text-muted">{{ link.pharmacy_obj.city }}</small>
+                                {% if link.comment %}
+                                <br><small class="text-danger"><i class="bi bi-exclamation-circle"></i> {{ link.comment[:25] }}{% if link.comment|length > 25 %}...{% endif %}</small>
+                                {% endif %}
+                            </div>
+                            <div class="text-end ms-2">
+                                <span class="badge status-{{ link.status }} mb-1">
+                                    {% if link.status == 'done' %}Fait{% endif %}
+                                    {% if link.status == 'scheduled' %}Prog{% endif %}
+                                    {% if link.status == 'pending' %}A faire{% endif %}
+                                    {% if link.status == 'problem' %}Prob{% endif %}
+                                    {% if link.status == 'cancelled' %}Annul{% endif %}
+                                </span>
+                                <br>
+                                <small class="text-muted">
+                                    {% if link.scheduled_date %}{{ link.scheduled_date.strftime('%d/%m %H:%M') }}
+                                    {% elif link.done_date %}{{ link.done_date.strftime('%d/%m %H:%M') }}
+                                    {% elif link.completed_date %}{{ link.completed_date.strftime('%d/%m %H:%M') }}
+                                    {% else %}-{% endif %}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h6 class="mb-0">Carte</h6>
+            </div>
+            <div class="card-body p-0">
+                <div id="map"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <div class="card h-100">
+            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Calendrier - Cliquez sur une date pour voir les creneaux</h6>
+            </div>
+            <div class="card-body">
+                <div id="calendar"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal statut -->
+<div class="modal fade" id="statusModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Modifier: <span id="modalPharmacyName"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="statusLinkId">
+                <div class="mb-3">
+                    <label class="form-label">Statut</label>
+                    <select class="form-select" id="newStatus" onchange="toggleFields()">
+                        <option value="pending">A faire</option>
+                        <option value="scheduled">Programme</option>
+                        <option value="done">Fait</option>
+                        <option value="problem">Probleme</option>
+                        <option value="cancelled">Annule</option>
+                    </select>
+                </div>
+                <div class="mb-3" id="dateField">
+                    <label class="form-label">Date et heure</label>
+                    <input type="datetime-local" class="form-control" id="scheduleDate">
+                </div>
+                <div class="mb-3" id="completedDateField" style="display:none;">
+                    <label class="form-label">Date de realisation</label>
+                    <input type="datetime-local" class="form-control" id="completedDate">
+                </div>
+                <div class="mb-3" id="commentField" style="display:none;">
+                    <label class="form-label">Commentaire</label>
+                    <textarea class="form-control" id="statusComment" rows="2" placeholder="Expliquez..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-primary" onclick="saveStatus()">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal jour avec creneaux -->
+<div class="modal fade" id="dayModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="dayModalTitle">Details du jour</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> 
+                    Cliquez sur un creneau libre pour y assigner une pharmacie. 
+                    Cliquez sur un creneau occupe pour le modifier.
+                </div>
+                <div id="daySlots"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal assigner pharmacie a un creneau -->
+<div class="modal fade" id="assignModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">Assigner a <span id="assignTime"></span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="assignDate">
+                <input type="hidden" id="assignHour">
+                
+                <div class="mb-3">
+                    <label class="form-label">Choisir une pharmacie</label>
+                    <select class="form-select" id="assignPharmacy">
+                        <option value="">-- Selectionner --</option>
+                        {% for link in pharmacy_links %}
+                        <option value="{{ link.pharmacy_id }}">{{ link.pharmacy_obj.name }} ({{ link.pharmacy_obj.city }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Statut</label>
+                    <select class="form-select" id="assignStatus">
+                        <option value="scheduled">Programme</option>
+                        <option value="done">Fait</option>
+                        <option value="problem">Probleme</option>
+                        <option value="cancelled">Annule</option>
+                    </select>
+                </div>
+                
+                <div class="mb-3" id="assignCommentField" style="display:none;">
+                    <label class="form-label">Commentaire</label>
+                    <textarea class="form-control" id="assignComment" rows="2"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-success" onclick="saveAssignment()">Assigner</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
+<script>
+let calendar = null;
+let map = null;
+let currentDate = null;
+let currentSlotTime = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    initCalendar();
+    initMap();
+    
+    document.getElementById('assignStatus').addEventListener('change', function() {
+        const show = this.value === 'problem' || this.value === 'cancelled';
+        document.getElementById('assignCommentField').style.display = show ? 'block' : 'none';
+    });
+});
+
+function initCalendar() {
+    const calendarEl = document.getElementById('calendar');
+    if (!calendarEl) return;
+    
+    calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        locale: 'fr',
+        firstDay: 1,
+        height: '100%',
+        headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,timeGridWeek'
+        },
+        events: '/campaigns/{{ campaign.id }}/calendar_data',
+        dateClick: function(info) {
+            showDaySlots(info.dateStr);
+        },
+        eventClick: function(info) {
+            showDaySlots(info.event.startStr.substring(0, 10));
+        }
+    });
+    
+    calendar.render();
+}
+
+function initMap() {
+    const mapEl = document.getElementById('map');
+    if (!mapEl) return;
+    
+    map = L.map('map').setView([46.2276, 2.2137], 5);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    
+    fetch('/campaigns/{{ campaign.id }}/map_data')
+        .then(r => r.json())
+        .then(data => {
+            if (data.length === 0) return;
+            
+            const markers = [];
+            const colors = {done:'#2ecc71', scheduled:'#3498db', pending:'#95a5a6', problem:'#e74c3c', cancelled:'#7f8c8d'};
+            
+            data.forEach(p => {
+                const marker = L.circleMarker([p.lat, p.lng], {
+                    radius: 8,
+                    fillColor: colors[p.status] || '#95a5a6',
+                    color: '#fff',
+                    weight: 2,
+                    fillOpacity: 0.9
+                }).addTo(map);
+                
+                marker.bindPopup('<b>' + p.name + '</b><br>' + p.city + '<br>Statut: ' + p.status);
+                markers.push(marker);
+            });
+            
+            if (markers.length > 0) {
+                const group = new L.featureGroup(markers);
+                map.fitBounds(group.getBounds().pad(0.2));
+            }
+        });
+}
+
+function filterByStatus(status) {
+    document.querySelectorAll('.pharmacy-item').forEach(item => {
+        item.style.display = (status === 'all' || item.dataset.status === status) ? '' : 'none';
+    });
+}
+
+function showStatusModal(linkId, currentStatus, pharmacyName) {
+    document.getElementById('statusLinkId').value = linkId;
+    document.getElementById('newStatus').value = currentStatus;
+    document.getElementById('modalPharmacyName').textContent = pharmacyName || 'Pharmacie';
+    document.getElementById('scheduleDate').value = '';
+    document.getElementById('completedDate').value = '';
+    document.getElementById('statusComment').value = '';
+    
+    toggleFields();
+    new bootstrap.Modal(document.getElementById('statusModal')).show();
+}
+
+function toggleFields() {
+    const status = document.getElementById('newStatus').value;
+    
+    // Date/heure pour programme
+    document.getElementById('dateField').style.display = 
+        (status === 'scheduled') ? 'block' : 'none';
+    
+    // Date de realisation pour fait, probleme, annule
+    document.getElementById('completedDateField').style.display = 
+        (status === 'done' || status === 'problem' || status === 'cancelled') ? 'block' : 'none';
+    
+    // Commentaire pour probleme et annule
+    document.getElementById('commentField').style.display = 
+        (status === 'problem' || status === 'cancelled') ? 'block' : 'none';
+}
+
+function saveStatus() {
+    const linkId = document.getElementById('statusLinkId').value;
+    const status = document.getElementById('newStatus').value;
+    const scheduleDate = document.getElementById('scheduleDate').value;
+    const completedDate = document.getElementById('completedDate').value;
+    const comment = document.getElementById('statusComment').value;
+    
+    // Validation
+    if (status === 'scheduled' && !scheduleDate) {
+        alert('Veuillez choisir une date et heure pour le programme');
+        return;
+    }
+    if ((status === 'done' || status === 'problem' || status === 'cancelled') && !completedDate) {
+        alert('Veuillez choisir la date de realisation');
+        return;
+    }
+    if ((status === 'problem' || status === 'cancelled') && !comment) {
+        alert('Veuillez ajouter un commentaire');
+        return;
+    }
+    
+    const data = {
+        link_id: parseInt(linkId),
+        status: status,
+        scheduled_date: scheduleDate || null,
+        completed_date: completedDate || null,
+        comment: comment || null
+    };
+    
+    fetch('/campaigns/{{ campaign.id }}/update_status', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) location.reload();
+        else alert('Erreur: ' + (data.error || 'Inconnue'));
+    });
+}
+
+// Afficher les creneaux du jour
+function showDaySlots(dateStr) {
+    currentDate = dateStr;
+    const date = new Date(dateStr);
+    document.getElementById('dayModalTitle').textContent = date.toLocaleDateString('fr-FR', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
+    
+    fetch('/campaigns/{{ campaign.id }}/pharmacies_by_date?date=' + dateStr)
+        .then(r => r.json())
+        .then(data => {
+            // Organiser par heure
+            const slots = {};
+            data.forEach(item => {
+                if (item.time) {
+                    slots[item.time] = item;
+                }
+            });
+            
+            let html = '';
+            
+            // Creneaux de 8h a 18h par tranche de 30min
+            for (let h = 8; h <= 18; h++) {
+                for (let m = 0; m < 60; m += 30) {
+                    const timeStr = (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+                    const item = slots[timeStr];
+                    
+                    if (item) {
+                        // Creneau occupe
+                        const colors = {done:'success', scheduled:'primary', pending:'secondary', problem:'danger', cancelled:'dark'};
+                        const icons = {done:'✓', scheduled:'📅', problem:'⚠️', cancelled:'❌', pending:'⏳'};
+                        
+                        html += '<div class="time-slot ' + item.status + '" onclick="editSlot(\'' + timeStr + '\', ' + item.id + ')">';
+                        html += '<div class="d-flex justify-content-between align-items-center">';
+                        html += '<div>';
+                        html += '<span class="badge bg-' + colors[item.status] + ' me-2">' + timeStr + '</span>';
+                        html += '<strong>' + item.pharmacy_name + '</strong>';
+                        html += '<br><small class="text-muted">' + item.city + '</small>';
+                        if (item.comment) html += '<br><small class="text-danger">' + item.comment + '</small>';
+                        html += '</div>';
+                        html += '<span class="fs-4">' + icons[item.status] + '</span>';
+                        html += '</div></div>';
+                    } else {
+                        // Creneau libre
+                        html += '<div class="time-slot empty" onclick="openAssignModal(\'' + timeStr + '\')">';
+                        html += '<div class="d-flex justify-content-between align-items-center">';
+                        html += '<span class="badge bg-light text-muted">' + timeStr + '</span>';
+                        html += '<span><i class="bi bi-plus-circle"></i> Creneau libre - Cliquer pour assigner</span>';
+                        html += '</div></div>';
+                    }
+                }
+            }
+            
+            document.getElementById('daySlots').innerHTML = html;
+            new bootstrap.Modal(document.getElementById('dayModal')).show();
+        });
+}
+
+// Ouvrir modal pour assigner un creneau libre
+function openAssignModal(timeStr) {
+    currentSlotTime = timeStr;
+    document.getElementById('assignDate').value = currentDate;
+    document.getElementById('assignHour').value = timeStr;
+    document.getElementById('assignTime').textContent = timeStr;
+    document.getElementById('assignPharmacy').value = '';
+    document.getElementById('assignStatus').value = 'scheduled';
+    document.getElementById('assignComment').value = '';
+    document.getElementById('assignCommentField').style.display = 'none';
+    
+    new bootstrap.Modal(document.getElementById('assignModal')).show();
+}
+
+// Sauvegarder l'assignation
+function saveAssignment() {
+    const pharmacyId = document.getElementById('assignPharmacy').value;
+    const status = document.getElementById('assignStatus').value;
+    const comment = document.getElementById('assignComment').value;
+    
+    if (!pharmacyId) {
+        alert('Veuillez choisir une pharmacie');
+        return;
+    }
+    
+    // Construire la date/heure complete
+    const dateTime = currentDate + 'T' + currentSlotTime;
+    
+    const data = {
+        pharmacy_id: parseInt(pharmacyId),
+        status: status,
+        scheduled_date: dateTime,
+        completed_date: (status === 'done' || status === 'problem' || status === 'cancelled') ? dateTime : null,
+        comment: comment || null
+    };
+    
+    fetch('/campaigns/{{ campaign.id }}/update_status', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            // Fermer les modals et rafraichir
+            bootstrap.Modal.getInstance(document.getElementById('assignModal')).hide();
+            bootstrap.Modal.getInstance(document.getElementById('dayModal')).hide();
+            calendar.refetchEvents();
+            location.reload();
+        } else {
+            alert('Erreur: ' + (data.error || 'Inconnue'));
+        }
+    });
+}
+
+// Editer un creneau existant (redirige vers le modal de statut)
+function editSlot(timeStr, linkId) {
+    // Trouver la pharmacie dans la liste
+    const pharmacyItem = document.querySelector('[data-link-id="' + linkId + '"]');
+    if (pharmacyItem) {
+        pharmacyItem.click();
+    }
+}
+</script>
+{% endblock %}

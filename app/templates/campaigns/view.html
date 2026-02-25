@@ -1,0 +1,1260 @@
+{% extends "base.html" %}
+
+{% block title %}{{ campaign.name }} - Dermo-CRM{% endblock %}
+{% block page_title %}{{ campaign.name }}{% endblock %}
+
+{% block extra_css %}
+<link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/main.min.css ' rel='stylesheet' />
+<style>
+    .status-done { background: #2ecc71 !important; color: white !important; }
+    .status-scheduled { background: #3498db !important; color: white !important; }
+    .status-pending { background: #95a5a6 !important; color: white !important; }
+    .status-problem { background: #e74c3c !important; color: white !important; }
+    .status-cancelled { background: #7f8c8d !important; color: white !important; }
+    
+    #map { height: 300px; border-radius: 10px; }
+    #calendar { height: 500px; }
+    .left-panel { max-height: 85vh; overflow-y: auto; }
+    .pharmacy-item { cursor: pointer; transition: all 0.2s; }
+    .pharmacy-item:hover { background-color: #e3f2fd; transform: translateX(5px); }
+    
+    .datetime-preview {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 15px;
+        border-radius: 10px;
+        margin: 15px 0;
+        text-align: center;
+    }
+    .datetime-preview .date-big { font-size: 1.5em; font-weight: bold; }
+    .datetime-preview .time-big { font-size: 2em; font-weight: bold; margin: 10px 0; }
+    
+    .email-editor {
+        background: #f8f9fa;
+        border: 2px solid #dee2e6;
+        border-radius: 8px;
+        padding: 15px;
+    }
+    .email-field { margin-bottom: 10px; }
+    .email-field label { font-weight: bold; color: #495057; font-size: 0.9em; }
+    
+    .time-adjust {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 10px;
+    }
+    .time-adjust button {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        border: none;
+        background: #007bff;
+        color: white;
+        font-size: 1.2em;
+        cursor: pointer;
+    }
+    .time-adjust button:hover { background: #0056b3; }
+    .time-adjust .current-time {
+        font-size: 1.3em;
+        font-weight: bold;
+        min-width: 80px;
+        text-align: center;
+    }
+    
+    .quick-status {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+    }
+    .quick-status button {
+        flex: 1;
+        min-width: 100px;
+        padding: 15px;
+        border: 2px solid #dee2e6;
+        background: white;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .quick-status button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .quick-status button.active {
+        border-color: #007bff;
+        background: #e3f2fd;
+    }
+    
+    .time-slot { 
+        padding: 15px; 
+        border-left: 4px solid; 
+        margin-bottom: 8px; 
+        background: white; 
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .time-slot:hover { transform: scale(1.02); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .time-slot.done { border-color: #2ecc71; }
+    .time-slot.scheduled { border-color: #3498db; }
+    .time-slot.problem { border-color: #e74c3c; }
+    .time-slot.cancelled { border-color: #7f8c8d; }
+    .time-slot.empty { 
+        border-color: #ddd; 
+        border-style: dashed; 
+        color: #999;
+        cursor: pointer;
+    }
+    .time-slot.empty:hover { 
+        background: #e8f5e9; 
+        border-color: #4caf50;
+        color: #2e7d32;
+    }
+    
+    .btn-loading {
+        position: relative;
+        pointer-events: none;
+    }
+    .btn-loading:after {
+        content: '';
+        position: absolute;
+        width: 16px;
+        height: 16px;
+        top: 50%;
+        left: 50%;
+        margin-left: -8px;
+        margin-top: -8px;
+        border: 2px solid #ffffff;
+        border-radius: 50%;
+        border-top-color: transparent;
+        animation: spinner 0.8s linear infinite;
+    }
+    @keyframes spinner {
+        to { transform: rotate(360deg); }
+    }
+    
+    /* NOUVEAU: Styles pour le modal d'ajout de pharmacie */
+    .pharmacy-option {
+        padding: 10px;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        margin-bottom: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .pharmacy-option:hover {
+        background: #e9ecef;
+        border-color: #adb5bd;
+    }
+    .pharmacy-option.selected {
+        background: #d1ecf1;
+        border-color: #17a2b8;
+        border-width: 2px;
+    }
+    .pharmacy-option .check-icon {
+        display: none;
+    }
+    .pharmacy-option.selected .check-icon {
+        display: inline;
+    }
+    .modal-pharmacy-select {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                    <h4>{{ campaign.name }}</h4>
+                    <p class="text-muted mb-0">{{ campaign.description or 'Aucune description' }}</p>
+                    <small class="text-muted">{{ campaign.start_date.strftime('%d/%m/%Y') }} - {{ campaign.end_date.strftime('%d/%m/%Y') }}</small>
+                </div>
+                <div>
+                    <a href="{{ url_for('campaigns.edit', id=campaign.id) }}" class="btn btn-warning btn-sm">
+                        <i class="bi bi-pencil"></i> Modifier
+                    </a>
+                    <a href="{{ url_for('campaigns.index') }}" class="btn btn-secondary btn-sm">Retour</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="d-flex gap-2 flex-wrap">
+            <button class="btn btn-outline-secondary btn-sm" onclick="filterByStatus('all')">Toutes ({{ stats.total }})</button>
+            <button class="btn btn-success btn-sm" onclick="filterByStatus('done')">Fait ({{ stats.done }})</button>
+            <button class="btn btn-primary btn-sm" onclick="filterByStatus('scheduled')">Programme ({{ stats.scheduled }})</button>
+            <button class="btn btn-secondary btn-sm" onclick="filterByStatus('pending')">A faire ({{ stats.pending }})</button>
+            <button class="btn btn-danger btn-sm" onclick="filterByStatus('problem')">Probleme ({{ stats.problem }})</button>
+            <button class="btn btn-dark btn-sm" onclick="filterByStatus('cancelled')">Annule ({{ stats.cancelled }})</button>
+            <!-- NOUVEAU: Bouton ajouter pharmacie -->
+            <button class="btn btn-success btn-sm ms-auto" onclick="openAddPharmacyModal()">
+                <i class="bi bi-plus-lg"></i> Ajouter pharmacie
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4 left-panel">
+        <div class="card mb-3">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Pharmacies ({{ stats.total }})</h6>
+                <!-- NOUVEAU: Bouton + dans le header -->
+                <button class="btn btn-sm btn-light" onclick="openAddPharmacyModal()" title="Ajouter une pharmacie">
+                    <i class="bi bi-plus-lg"></i>
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush" id="pharmaciesList">
+                    {% for link in pharmacy_links %}
+                    <div class="list-group-item pharmacy-item" 
+                         data-status="{{ link.status }}" 
+                         data-link-id="{{ link.id }}"
+                         data-pharmacy-name="{{ link.pharmacy_obj.name }}"
+                         data-pharmacy-email="{{ link.pharmacy_obj.email or '' }}"
+                         data-current-date="{{ link.scheduled_date.isoformat() if link.scheduled_date else '' }}"
+                         onclick="openQuickModal({{ link.id }}, '{{ link.status }}', '{{ link.pharmacy_obj.name }}', '{{ link.pharmacy_obj.email or '' }}', '{{ link.scheduled_date.isoformat() if link.scheduled_date else '' }}', '{{ link.comment or '' }}')">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <strong>{{ link.pharmacy_obj.name }}</strong>
+                                <br><small class="text-muted">{{ link.pharmacy_obj.city }}</small>
+                                {% if link.comment and link.status in ['problem', 'cancelled'] %}
+                                <br><small class="text-danger"><i class="bi bi-exclamation-circle"></i> {{ link.comment[:25] }}{% if link.comment|length > 25 %}...{% endif %}</small>
+                                {% endif %}
+                            </div>
+                            <div class="text-end ms-2">
+                                <span class="badge status-{{ link.status }} mb-1">
+                                    {% if link.status == 'done' %}Fait{% endif %}
+                                    {% if link.status == 'scheduled' %}Prog{% endif %}
+                                    {% if link.status == 'pending' %}A faire{% endif %}
+                                    {% if link.status == 'problem' %}Prob{% endif %}
+                                    {% if link.status == 'cancelled' %}Annul{% endif %}
+                                </span>
+                                <br>
+                                <small class="text-muted">
+                                    {% if link.scheduled_date %}{{ link.scheduled_date.strftime('%d/%m %H:%M') }}
+                                    {% elif link.done_date %}{{ link.done_date.strftime('%d/%m %H:%M') }}
+                                    {% elif link.completed_date %}{{ link.completed_date.strftime('%d/%m %H:%M') }}
+                                    {% else %}-{% endif %}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="list-group-item text-center py-4 text-muted">
+                        <i class="bi bi-shop display-4"></i>
+                        <p class="mt-2">Aucune pharmacie dans cette campagne</p>
+                        <button class="btn btn-primary btn-sm" onclick="openAddPharmacyModal()">
+                            <i class="bi bi-plus-lg"></i> Ajouter une pharmacie
+                        </button>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h6 class="mb-0">Carte</h6>
+            </div>
+            <div class="card-body p-0">
+                <div id="map"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <div class="card h-100">
+            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Calendrier - Cliquez sur une date pour voir les creneaux</h6>
+            </div>
+            <div class="card-body">
+                <div id="calendar"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal fluide (existant) -->
+<div class="modal fade" id="quickModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="quickModalTitle">Modifier la pharmacie</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="quickLinkId">
+                <input type="hidden" id="quickOldStatus">
+                <input type="hidden" id="pharmacyEmail">
+                
+                <!-- ETAPE 1: Choix statut -->
+                <div id="stepStatus">
+                    <label class="form-label fw-bold mb-3">Choisir le statut</label>
+                    <div class="quick-status">
+                        <button type="button" onclick="selectStatus('pending')" data-status="pending">
+                            <i class="bi bi-hourglass fs-3 d-block mb-2"></i>
+                            <span>A faire</span>
+                        </button>
+                        <button type="button" onclick="selectStatus('scheduled')" data-status="scheduled">
+                            <i class="bi bi-calendar-check fs-3 d-block mb-2"></i>
+                            <span>Programmer</span>
+                        </button>
+                        <button type="button" onclick="selectStatus('done')" data-status="done">
+                            <i class="bi bi-check-circle fs-3 d-block mb-2"></i>
+                            <span>Fait</span>
+                        </button>
+                        <button type="button" onclick="selectStatus('problem')" data-status="problem">
+                            <i class="bi bi-exclamation-triangle fs-3 d-block mb-2"></i>
+                            <span>Probleme</span>
+                        </button>
+                        <button type="button" onclick="selectStatus('cancelled')" data-status="cancelled">
+                            <i class="bi bi-x-circle fs-3 d-block mb-2"></i>
+                            <span>Annuler</span>
+                        </button>
+                    </div>
+                    <!-- NOUVEAU: Bouton retirer -->
+                    <hr>
+                    <button type="button" class="btn btn-outline-danger w-100" onclick="removeCurrentPharmacy()">
+                        <i class="bi bi-trash"></i> Retirer cette pharmacie de la campagne
+                    </button>
+                </div>
+                
+                <!-- ETAPE 2: Date/heure -->
+                <div id="stepDateTime" style="display:none;">
+                    <hr>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <label class="form-label fw-bold mb-0">Date et heure de visite</label>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="backToStatus()">
+                            <i class="bi bi-arrow-left"></i> Changer de statut
+                        </button>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label class="form-label">Date</label>
+                            <input type="date" class="form-control form-control-lg" id="visitDate" onchange="updatePreview()">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Heure</label>
+                            <div class="time-adjust">
+                                <button type="button" onclick="adjustTime(-30)">-</button>
+                                <span class="current-time" id="timeDisplay">09:30</span>
+                                <button type="button" onclick="adjustTime(30)">+</button>
+                            </div>
+                            <input type="hidden" id="visitTime" value="09:30">
+                        </div>
+                    </div>
+                    
+                    <div class="datetime-preview" id="datetimePreview">
+                        <div class="date-big" id="previewDate">...</div>
+                        <div class="time-big" id="previewTime">09:30</div>
+                        <div class="edit-hint">
+                            <i class="bi bi-info-circle"></i> 
+                            L'heure d'arrivee est estimee a plus ou moins 15 min selon la circulation
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="button" class="btn btn-primary btn-lg" onclick="confirmDateTime()" id="btnConfirmDate">
+                            <i class="bi bi-check-lg"></i> Confirmer cette date
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- ETAPE 3: Email -->
+                <div id="stepEmail" style="display:none;">
+                    <hr>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <label class="form-label fw-bold mb-0">
+                            <i class="bi bi-envelope"></i> Configuration de l'email
+                        </label>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="backToDateTime()">
+                            <i class="bi bi-arrow-left"></i> Modifier l'heure
+                        </button>
+                    </div>
+                    
+                    <div class="email-editor">
+                        <div class="email-field">
+                            <label>Destinataire (Pharmacie) *</label>
+                            <input type="email" class="form-control" id="emailTo" placeholder="pharmacie@email.com" required>
+                        </div>
+                        
+                        <div class="email-field">
+                            <label>En copie (CC)</label>
+                            <input type="email" class="form-control" id="emailCc" placeholder="votre-email@entreprise.com">
+                        </div>
+                        
+                        <div class="email-field">
+                            <label>Objet *</label>
+                            <input type="text" class="form-control" id="emailSubject" value="Confirmation de visite" required>
+                        </div>
+                        
+                        <div class="email-field">
+                            <label>Message *</label>
+                            <textarea class="form-control" id="emailBody" rows="10" required></textarea>
+                        </div>
+                        
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="sendEmailNow" checked>
+                            <label class="form-check-label" for="sendEmailNow">
+                                <strong>Envoyer l'email maintenant</strong>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2 mt-3">
+                        <button type="button" class="btn btn-success btn-lg" onclick="saveAll()" id="btnSaveEmail">
+                            <i class="bi bi-send"></i> Enregistrer et envoyer l'email
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="skipEmail()" id="btnSkipEmail">
+                            Enregistrer sans envoyer d'email
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- ETAPE 4: Commentaire -->
+                <div id="stepComment" style="display:none;">
+                    <hr>
+                    <label class="form-label fw-bold">Motif *</label>
+                    <textarea class="form-control" id="problemComment" rows="3" placeholder="Expliquez la raison..." required></textarea>
+                    <div class="d-grid gap-2 mt-3">
+                        <button type="button" class="btn btn-primary btn-lg" onclick="saveStatusOnly()" id="btnSaveComment">
+                            <i class="bi bi-check-lg"></i> Enregistrer
+                        </button>
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal jour avec creneaux (existant) -->
+<div class="modal fade" id="dayModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="dayModalTitle">Details du jour</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> 
+                    Cliquez sur un creneau libre pour y assigner une pharmacie. 
+                    Cliquez sur un creneau occupe pour le modifier.
+                </div>
+                <div id="daySlots"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal assigner pharmacie -->
+<div class="modal fade" id="assignModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">Assigner a <span id="assignTime"></span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="assignDate">
+                <input type="hidden" id="assignHour">
+                
+                <div class="mb-3">
+                    <label class="form-label">Choisir une pharmacie *</label>
+                    <select class="form-select" id="assignPharmacy" required>
+                        <option value="">-- Selectionner --</option>
+                        <!-- CORRECTION: Toutes les pharmacies de la campagne, pas seulement pending -->
+                        {% for link in pharmacy_links %}
+                        <option value="{{ link.pharmacy_id }}" 
+                                data-link-id="{{ link.id }}"
+                                data-name="{{ link.pharmacy_obj.name }}" 
+                                data-email="{{ link.pharmacy_obj.email or '' }}">
+                            {{ link.pharmacy_obj.name }} ({{ link.pharmacy_obj.city }}) - {{ link.status }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Statut</label>
+                    <select class="form-select" id="assignStatus">
+                        <option value="scheduled" selected>Programme</option>
+                        <option value="done">Fait</option>
+                    </select>
+                </div>
+                
+                <div class="mb-3" id="assignCommentField" style="display:none;">
+                    <label class="form-label">Commentaire</label>
+                    <textarea class="form-control" id="assignComment" rows="2"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-success" onclick="saveAssignment()" id="btnAssign">
+                    <i class="bi bi-check-lg"></i> Assigner
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- NOUVEAU: Modal Ajouter Pharmacie -->
+<div class="modal fade" id="addPharmacyModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-plus-lg"></i> Ajouter une pharmacie</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <input type="text" class="form-control" id="pharmacySearch" 
+                           placeholder="Rechercher une pharmacie..." onkeyup="filterPharmacies()">
+                </div>
+                <div class="modal-pharmacy-select" id="pharmacyList">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Chargement...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-success" onclick="confirmAddPharmacy()" id="btnConfirmAdd" disabled>
+                    <i class="bi bi-check-lg"></i> Ajouter la selection
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js '></script>
+<script>
+let calendar = null;
+let map = null;
+let currentDate = null;
+let selectedStatus = null;
+let selectedDateTime = null;
+let currentPharmacyName = '';
+let currentPharmacyEmail = '';
+let currentSlotTime = null;
+let currentLinkId = null; // NOUVEAU: pour stocker l'ID en cours
+
+document.addEventListener('DOMContentLoaded', function() {
+    initCalendar();
+    initMap();
+    
+    const assignStatus = document.getElementById('assignStatus');
+    if (assignStatus) {
+        assignStatus.addEventListener('change', function() {
+            const show = this.value === 'problem' || this.value === 'cancelled';
+            document.getElementById('assignCommentField').style.display = show ? 'block' : 'none';
+        });
+    }
+});
+
+function initCalendar() {
+    const calendarEl = document.getElementById('calendar');
+    if (!calendarEl) return;
+    
+    calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        locale: 'fr',
+        firstDay: 1,
+        height: '100%',
+        headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,timeGridWeek'
+        },
+        events: '/campaigns/{{ campaign.id }}/calendar_data',
+        dateClick: function(info) {
+            showDaySlots(info.dateStr);
+        },
+        eventClick: function(info) {
+            showDaySlots(info.event.startStr.substring(0, 10));
+        }
+    });
+    
+    calendar.render();
+}
+
+function initMap() {
+    const mapEl = document.getElementById('map');
+    if (!mapEl) return;
+    
+    map = L.map('map').setView([46.2276, 2.2137], 5);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    
+    fetch('/campaigns/{{ campaign.id }}/map_data')
+        .then(r => r.json())
+        .then(data => {
+            if (data.length === 0) return;
+            
+            const markers = [];
+            const colors = {done:'#2ecc71', scheduled:'#3498db', pending:'#95a5a6', problem:'#e74c3c', cancelled:'#7f8c8d'};
+            
+            data.forEach(p => {
+                const marker = L.circleMarker([p.lat, p.lng], {
+                    radius: 8,
+                    fillColor: colors[p.status] || '#95a5a6',
+                    color: '#fff',
+                    weight: 2,
+                    fillOpacity: 0.9
+                }).addTo(map);
+                
+                marker.bindPopup('<b>' + p.name + '</b><br>' + p.city + '<br>Statut: ' + p.status);
+                markers.push(marker);
+            });
+            
+            if (markers.length > 0) {
+                const group = new L.featureGroup(markers);
+                map.fitBounds(group.getBounds().pad(0.2));
+            }
+        });
+}
+
+function filterByStatus(status) {
+    document.querySelectorAll('.pharmacy-item').forEach(item => {
+        item.style.display = (status === 'all' || item.dataset.status === status) ? '' : 'none';
+    });
+}
+
+function openQuickModal(linkId, currentStatus, pharmacyName, pharmacyEmail, existingDate, existingComment) {
+    currentLinkId = linkId; // NOUVEAU: stocker l'ID
+    document.getElementById('quickLinkId').value = linkId;
+    document.getElementById('quickOldStatus').value = currentStatus;
+    document.getElementById('quickModalTitle').textContent = pharmacyName;
+    document.getElementById('pharmacyEmail').value = pharmacyEmail;
+    currentPharmacyName = pharmacyName;
+    currentPharmacyEmail = pharmacyEmail;
+    
+    document.getElementById('stepStatus').style.display = 'block';
+    document.getElementById('stepDateTime').style.display = 'none';
+    document.getElementById('stepEmail').style.display = 'none';
+    document.getElementById('stepComment').style.display = 'none';
+    
+    resetButtons();
+    
+    document.querySelectorAll('.quick-status button').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.status === currentStatus) {
+            btn.classList.add('active');
+        }
+    });
+    
+    if (existingDate && existingDate !== '') {
+        const date = new Date(existingDate);
+        const dateStr = date.toISOString().split('T')[0];
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        
+        document.getElementById('visitDate').value = dateStr;
+        document.getElementById('visitTime').value = `${hours}:${minutes}`;
+        document.getElementById('timeDisplay').textContent = `${hours}:${minutes}`;
+    } else {
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('visitDate').value = today;
+        document.getElementById('visitTime').value = '09:30';
+        document.getElementById('timeDisplay').textContent = '09:30';
+    }
+    
+    document.getElementById('emailTo').value = pharmacyEmail || '';
+    document.getElementById('emailCc').value = '';
+    document.getElementById('emailSubject').value = `Confirmation de visite - {{ campaign.name }}`;
+    document.getElementById('problemComment').value = existingComment || '';
+    
+    updatePreview();
+    new bootstrap.Modal(document.getElementById('quickModal')).show();
+}
+
+// NOUVEAU: Fonction pour retirer la pharmacie
+function removeCurrentPharmacy() {
+    if (!currentLinkId) return;
+    
+    if (!confirm('Retirer cette pharmacie de la campagne ? Cette action est irreversible.')) {
+        return;
+    }
+    
+    fetch('/campaigns/{{ campaign.id }}/remove_pharmacy', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify({link_id: currentLinkId})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('quickModal')).hide();
+            location.reload();
+        } else {
+            alert('Erreur: ' + (data.error || 'Inconnue'));
+        }
+    })
+    .catch(err => {
+        alert('Erreur: ' + err.message);
+    });
+}
+
+function resetButtons() {
+    document.querySelectorAll('.btn-loading').forEach(btn => {
+        btn.classList.remove('btn-loading');
+    });
+}
+
+function setLoading(buttonId) {
+    const btn = document.getElementById(buttonId);
+    if (btn) btn.classList.add('btn-loading');
+}
+
+function selectStatus(status) {
+    selectedStatus = status;
+    
+    document.querySelectorAll('.quick-status button').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.status === status) {
+            btn.classList.add('active');
+        }
+    });
+    
+    if (status === 'pending') {
+        saveStatusOnly();
+        return;
+    }
+    
+    if (status === 'done') {
+        document.getElementById('stepStatus').style.display = 'none';
+        document.getElementById('stepDateTime').style.display = 'block';
+        document.getElementById('datetimePreview').style.display = 'none';
+        return;
+    }
+    
+    if (status === 'scheduled') {
+        document.getElementById('stepStatus').style.display = 'none';
+        document.getElementById('stepDateTime').style.display = 'block';
+        document.getElementById('datetimePreview').style.display = 'block';
+        updatePreview();
+        return;
+    }
+    
+    if (status === 'problem' || status === 'cancelled') {
+        document.getElementById('stepStatus').style.display = 'none';
+        document.getElementById('stepComment').style.display = 'block';
+        return;
+    }
+}
+
+function backToStatus() {
+    document.getElementById('stepStatus').style.display = 'block';
+    document.getElementById('stepDateTime').style.display = 'none';
+    document.getElementById('stepEmail').style.display = 'none';
+}
+
+function adjustTime(minutes) {
+    const timeInput = document.getElementById('visitTime');
+    const [hours, mins] = timeInput.value.split(':').map(Number);
+    
+    let totalMinutes = hours * 60 + mins + minutes;
+    if (totalMinutes < 0) totalMinutes = 0;
+    if (totalMinutes >= 24 * 60) totalMinutes = 23 * 60 + 59;
+    
+    const newHours = String(Math.floor(totalMinutes / 60)).padStart(2, '0');
+    const newMins = String(totalMinutes % 60).padStart(2, '0');
+    
+    timeInput.value = `${newHours}:${newMins}`;
+    document.getElementById('timeDisplay').textContent = `${newHours}:${newMins}`;
+    
+    updatePreview();
+}
+
+function updatePreview() {
+    const date = document.getElementById('visitDate').value;
+    const time = document.getElementById('visitTime').value;
+    
+    if (date && time) {
+        const dateObj = new Date(date + 'T' + time);
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        document.getElementById('previewDate').textContent = dateObj.toLocaleDateString('fr-FR', options);
+        document.getElementById('previewTime').textContent = time;
+        
+        updateEmailTemplate(date, time);
+    }
+}
+
+function updateEmailTemplate(date, time) {
+    const campaignName = "{{ campaign.name }}";
+    const dateObj = new Date(date + 'T' + time);
+    const dateStr = dateObj.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+    
+    const body = `Bonjour,
+
+Ceci est un email automatique de confirmation.
+
+Votre pharmacie (${currentPharmacyName}) est programmee pour une visite dans le cadre de la campagne "${campaignName}".
+
+Date : ${dateStr}
+Heure d'arrivee estimee : ${time} (plus ou moins 15 min selon la circulation routiere)
+
+Cordialement,
+L'equipe Dermo-CRM
+
+---
+[CECI EST UN EMAIL AUTOMATIQUE - MERCI DE NE PAS Y REPONDRE]`;
+    
+    document.getElementById('emailBody').value = body;
+}
+
+function confirmDateTime() {
+    const date = document.getElementById('visitDate').value;
+    const time = document.getElementById('visitTime').value;
+    
+    if (!date || !time) {
+        alert('Veuillez selectionner une date et une heure');
+        return;
+    }
+    
+    selectedDateTime = `${date}T${time}`;
+    
+    if (selectedStatus === 'scheduled') {
+        document.getElementById('stepDateTime').style.display = 'none';
+        document.getElementById('stepEmail').style.display = 'block';
+    } else {
+        saveStatusOnly();
+    }
+}
+
+function backToDateTime() {
+    document.getElementById('stepEmail').style.display = 'none';
+    document.getElementById('stepDateTime').style.display = 'block';
+}
+
+function skipEmail() {
+    saveStatusOnly();
+}
+
+function saveAll() {
+    const linkId = document.getElementById('quickLinkId').value;
+    const sendEmail = document.getElementById('sendEmailNow').checked;
+    const emailTo = document.getElementById('emailTo').value;
+    
+    if (sendEmail && !emailTo) {
+        alert('Veuillez saisir un destinataire pour l\'email');
+        document.getElementById('emailTo').focus();
+        return;
+    }
+    
+    setLoading('btnSaveEmail');
+    setLoading('btnSkipEmail');
+    
+    const data = {
+        link_id: parseInt(linkId),
+        status: selectedStatus,
+        scheduled_date: selectedStatus === 'scheduled' ? selectedDateTime : null,
+        completed_date: selectedStatus === 'done' ? selectedDateTime : null,
+        comment: null
+    };
+    
+    fetch('/campaigns/{{ campaign.id }}/update_status', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success && selectedStatus === 'scheduled' && sendEmail) {
+            const reminderData = {
+                link_id: result.link_id,
+                reminder_type: 'email_pharmacy',
+                scheduled_time: document.getElementById('visitTime').value,
+                custom_message: '',
+                send_confirmation: true,
+                email_to: document.getElementById('emailTo').value,
+                email_cc: document.getElementById('emailCc').value,
+                email_subject: document.getElementById('emailSubject').value,
+                email_body: document.getElementById('emailBody').value
+            };
+            
+            return fetch('/campaigns/{{ campaign.id }}/create_reminder', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify(reminderData)
+            }).then(r => r.json());
+        }
+        return Promise.resolve({ success: true, email_sent: false });
+    })
+    .then(result => {
+        resetButtons();
+        if (result.success) {
+            let msg = 'Enregistre avec succes!';
+            if (result.email_sent) {
+                msg += ' Email envoye.';
+            } else if (result.email_error) {
+                msg += ' Erreur email: ' + result.email_error;
+            }
+            alert(msg);
+            bootstrap.Modal.getInstance(document.getElementById('quickModal')).hide();
+            location.reload();
+        } else {
+            alert('Erreur: ' + (result.error || 'Inconnue'));
+        }
+    })
+    .catch(err => {
+        resetButtons();
+        alert('Erreur: ' + err.message);
+        console.error(err);
+    });
+}
+
+function saveStatusOnly() {
+    const linkId = document.getElementById('quickLinkId').value;
+    const comment = document.getElementById('problemComment').value;
+    
+    if ((selectedStatus === 'problem' || selectedStatus === 'cancelled') && !comment) {
+        alert('Veuillez saisir un motif');
+        document.getElementById('problemComment').focus();
+        return;
+    }
+    
+    setLoading('btnSaveComment');
+    
+    const data = {
+        link_id: parseInt(linkId),
+        status: selectedStatus,
+        scheduled_date: selectedStatus === 'scheduled' ? selectedDateTime : null,
+        completed_date: selectedStatus === 'done' ? selectedDateTime : null,
+        comment: (selectedStatus === 'problem' || selectedStatus === 'cancelled') ? comment : null
+    };
+    
+    fetch('/campaigns/{{ campaign.id }}/update_status', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(data => {
+        resetButtons();
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('quickModal')).hide();
+            location.reload();
+        } else {
+            alert('Erreur: ' + (data.error || 'Inconnue'));
+        }
+    })
+    .catch(err => {
+        resetButtons();
+        alert('Erreur: ' + err.message);
+    });
+}
+
+// ============================================
+// NOUVEAUX: FONCTIONS AJOUT PHARMACIE
+// ============================================
+
+let selectedPharmacyId = null;
+
+function openAddPharmacyModal() {
+    selectedPharmacyId = null;
+    document.getElementById('btnConfirmAdd').disabled = true;
+    document.getElementById('pharmacySearch').value = '';
+    document.getElementById('pharmacyList').innerHTML = `
+        <div class="text-center py-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Chargement...</span>
+            </div>
+        </div>
+    `;
+    
+    new bootstrap.Modal(document.getElementById('addPharmacyModal')).show();
+    
+    // Charger les pharmacies disponibles
+    fetch('/campaigns/{{ campaign.id }}/available_pharmacies')
+        .then(r => r.json())
+        .then(data => {
+            const list = document.getElementById('pharmacyList');
+            
+            if (data.error) {
+                list.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+                return;
+            }
+            
+            if (data.length === 0) {
+                list.innerHTML = '<div class="text-center text-muted py-3">Toutes les pharmacies sont deja dans cette campagne</div>';
+                return;
+            }
+            
+            list.innerHTML = '';
+            data.forEach(p => {
+                const div = document.createElement('div');
+                div.className = 'pharmacy-option';
+                div.dataset.id = p.id;
+                div.dataset.name = p.name.toLowerCase();
+                div.dataset.city = (p.city || '').toLowerCase();
+                div.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>${escapeHtml(p.name)}</strong>
+                            <div class="small text-muted">${escapeHtml(p.city || '')} - ${escapeHtml(p.address || 'Adresse non renseignee')}</div>
+                        </div>
+                        <i class="bi bi-check-circle-fill text-primary check-icon"></i>
+                    </div>
+                `;
+                div.onclick = () => selectPharmacyOption(p.id, div);
+                list.appendChild(div);
+            });
+        })
+        .catch(err => {
+            document.getElementById('pharmacyList').innerHTML = 
+                `<div class="alert alert-danger">Erreur de chargement: ${err.message}</div>`;
+        });
+}
+
+function selectPharmacyOption(id, element) {
+    selectedPharmacyId = id;
+    document.querySelectorAll('.pharmacy-option').forEach(el => {
+        el.classList.remove('selected');
+    });
+    element.classList.add('selected');
+    document.getElementById('btnConfirmAdd').disabled = false;
+}
+
+function filterPharmacies() {
+    const search = document.getElementById('pharmacySearch').value.toLowerCase();
+    document.querySelectorAll('.pharmacy-option').forEach(el => {
+        const name = el.dataset.name;
+        const city = el.dataset.city;
+        el.style.display = (name.includes(search) || city.includes(search)) ? 'block' : 'none';
+    });
+}
+
+function confirmAddPharmacy() {
+    if (!selectedPharmacyId) return;
+    
+    const btn = document.getElementById('btnConfirmAdd');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Ajout...';
+    
+    fetch('/campaigns/{{ campaign.id }}/add_pharmacy', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify({pharmacy_id: selectedPharmacyId})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('addPharmacyModal')).hide();
+            location.reload();
+        } else {
+            alert(data.error || 'Erreur lors de l\'ajout');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-check-lg"></i> Ajouter la selection';
+        }
+    })
+    .catch(err => {
+        alert('Erreur: ' + err.message);
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-check-lg"></i> Ajouter la selection';
+    });
+}
+
+// ============================================
+// FONCTIONS CALENDRIER (EXISTANTES)
+// ============================================
+
+function showDaySlots(dateStr) {
+    currentDate = dateStr;
+    const date = new Date(dateStr);
+    document.getElementById('dayModalTitle').textContent = date.toLocaleDateString('fr-FR', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
+    
+    fetch('/campaigns/{{ campaign.id }}/pharmacies_by_date?date=' + dateStr)
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                alert('Erreur: ' + data.error);
+                return;
+            }
+            
+            const slots = {};
+            data.forEach(item => {
+                if (item.time) {
+                    slots[item.time] = item;
+                }
+            });
+            
+            let html = '';
+            
+            for (let h = 8; h <= 18; h++) {
+                for (let m = 0; m < 60; m += 30) {
+                    const timeStr = (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+                    const item = slots[timeStr];
+                    
+                    if (item) {
+                        const colors = {done:'success', scheduled:'primary', pending:'secondary', problem:'danger', cancelled:'dark'};
+                        const icons = {done:'✓', scheduled:'📅', problem:'⚠️', cancelled:'❌', pending:'⏳'};
+                        const icon = icons[item.status] || '●';
+                        
+                        html += `<div class="time-slot ${item.status}" onclick="editSlot('${timeStr}', ${item.id})">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <span class="badge bg-${colors[item.status]} me-2">${timeStr}</span>
+                                    <strong>${escapeHtml(item.pharmacy_name)}</strong>
+                                    <br><small class="text-muted">${escapeHtml(item.city)}</small>
+                                    ${item.comment ? '<br><small class="text-danger">' + escapeHtml(item.comment) + '</small>' : ''}
+                                </div>
+                                <span class="fs-4">${icon}</span>
+                            </div>
+                        </div>`;
+                    } else {
+                        html += `<div class="time-slot empty" onclick="openAssignModal('${timeStr}')">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="badge bg-light text-muted">${timeStr}</span>
+                                <span><i class="bi bi-plus-circle"></i> Creneau libre - Cliquer pour assigner</span>
+                            </div>
+                        </div>`;
+                    }
+                }
+            }
+            
+            document.getElementById('daySlots').innerHTML = html;
+            new bootstrap.Modal(document.getElementById('dayModal')).show();
+        })
+        .catch(err => {
+            console.error('Erreur:', err);
+            alert('Erreur de chargement des creneaux: ' + err.message);
+        });
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function openAssignModal(timeStr) {
+    currentSlotTime = timeStr;
+    document.getElementById('assignDate').value = currentDate;
+    document.getElementById('assignHour').value = timeStr;
+    document.getElementById('assignTime').textContent = timeStr;
+    document.getElementById('assignPharmacy').value = '';
+    document.getElementById('assignStatus').value = 'scheduled';
+    document.getElementById('assignComment').value = '';
+    document.getElementById('assignCommentField').style.display = 'none';
+    
+    new bootstrap.Modal(document.getElementById('assignModal')).show();
+}
+
+function saveAssignment() {
+    const pharmacyId = document.getElementById('assignPharmacy').value;
+    const status = document.getElementById('assignStatus').value;
+    const comment = document.getElementById('assignComment').value;
+    
+    if (!pharmacyId) {
+        alert('Veuillez choisir une pharmacie');
+        return;
+    }
+    
+    // CORRECTION: Recuperer le link_id depuis l'option selectionnee
+    const select = document.getElementById('assignPharmacy');
+    const selectedOption = select.options[select.selectedIndex];
+    const linkId = selectedOption.dataset.linkId;
+    
+    setLoading('btnAssign');
+    
+    const dateTime = currentDate + 'T' + currentSlotTime;
+    
+    // CORRECTION: Utiliser link_id au lieu de pharmacy_id
+    const data = {
+        link_id: parseInt(linkId),  // On utilise le link_id existant
+        status: status,
+        scheduled_date: status === 'scheduled' ? dateTime : null,
+        completed_date: status === 'done' ? dateTime : null,
+        comment: comment || null
+    };
+    
+    fetch('/campaigns/{{ campaign.id }}/update_status', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(data => {
+        resetButtons();
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('assignModal')).hide();
+            bootstrap.Modal.getInstance(document.getElementById('dayModal')).hide();
+            
+            if (data.new_status === 'scheduled') {
+                const pharmacyName = selectedOption.dataset.name;
+                const pharmacyEmail = selectedOption.dataset.email;
+                
+                openQuickModal(data.link_id, 'scheduled', pharmacyName, pharmacyEmail, dateTime, '');
+                
+                document.getElementById('stepStatus').style.display = 'none';
+                document.getElementById('stepDateTime').style.display = 'none';
+                document.getElementById('stepEmail').style.display = 'block';
+                
+                document.getElementById('visitDate').value = currentDate;
+                document.getElementById('visitTime').value = currentSlotTime;
+                document.getElementById('timeDisplay').textContent = currentSlotTime;
+                selectedDateTime = dateTime;
+                selectedStatus = 'scheduled';
+                updatePreview();
+            } else {
+                calendar.refetchEvents();
+                location.reload();
+            }
+        } else {
+            alert('Erreur: ' + (data.error || 'Inconnue'));
+        }
+    })
+    .catch(err => {
+        resetButtons();
+        alert('Erreur: ' + err.message);
+        console.error(err);
+    });
+}
+
+function editSlot(timeStr, linkId) {
+    const pharmacyItem = document.querySelector('[data-link-id="' + linkId + '"]');
+    if (pharmacyItem) {
+        bootstrap.Modal.getInstance(document.getElementById('dayModal')).hide();
+        pharmacyItem.click();
+    }
+}
+</script>
+{% endblock %}

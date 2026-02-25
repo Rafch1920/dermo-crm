@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+
+{% block title %}Modifier Visite - Dermo-CRM{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-warning text-dark">
+                    <h4 class="mb-0"><i class="fas fa-edit"></i> Modifier la visite</h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" id="visitForm">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Pharmacie</label>
+                            <input type="text" class="form-control" value="{{ visit.pharmacy.name }}" readonly>
+                            <input type="hidden" name="pharmacy_id" value="{{ visit.pharmacy_id }}">
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="visit_date" class="form-label">Date *</label>
+                                <input type="date" class="form-control" id="visit_date" name="visit_date" 
+                                       value="{{ visit.visit_date.strftime('%Y-%m-%d') if visit.visit_date else '' }}" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="visit_time" class="form-label">Heure</label>
+                                <input type="time" class="form-control" id="visit_time" name="visit_time"
+                                       value="{{ visit.visit_time.strftime('%H:%M') if visit.visit_time else '' }}">
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="visit_type" class="form-label">Type de visite</label>
+                                <select class="form-select" id="visit_type" name="visit_type">
+                                    <option value="planifiee" {% if visit.visit_type == 'planifiee' %}selected{% endif %}>Planifiee</option>
+                                    <option value="ponctuelle" {% if visit.visit_type == 'ponctuelle' %}selected{% endif %}>Ponctuelle</option>
+                                    <option value="annuelle" {% if visit.visit_type == 'annuelle' %}selected{% endif %}>Annuelle</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="duration" class="form-label">Duree (minutes)</label>
+                                <input type="number" class="form-control" id="duration" name="duration" 
+                                       value="{{ visit.duration or '' }}" min="1" max="480">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="objectives" class="form-label">Objectifs</label>
+                            <textarea class="form-control" id="objectives" name="objectives" rows="2">{{ visit.objectives or '' }}</textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="report" class="form-label">Compte rendu</label>
+                            <textarea class="form-control" id="report" name="report" rows="4">{{ visit.report or '' }}</textarea>
+                        </div>
+                        
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{{ url_for('visits.detail', id=visit.id) }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-times"></i> Annuler
+                            </a>
+                            <button type="submit" class="btn btn-warning">
+                                <i class="fas fa-save"></i> Enregistrer
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

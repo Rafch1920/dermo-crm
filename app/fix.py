@@ -1,0 +1,368 @@
+# -*- coding: utf-8 -*-
+import os
+
+base_dir = r"C:\Users\USER\Desktop\dermo-crm\app\templates"
+
+# SEULEMENT les fichiers qui posent problème
+files_to_fix = {
+    'pharmacies/create.html': '''{% extends 'base.html' %}
+
+{% block title %}Nouvelle Pharmacie - Dermo-CRM{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fas fa-plus-circle"></i> Nouvelle Pharmacie</h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" id="pharmacyForm">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Nom *</label>
+                            <input type="text" class="form-control" id="name" name="name" required>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="type" class="form-label">Type</label>
+                                <select class="form-select" id="type" name="type">
+                                    <option value="pharmacie">Pharmacie</option>
+                                    <option value="parapharmacie">Parapharmacie</option>
+                                    <option value="hopital">Hopital</option>
+                                    <option value="clinique">Clinique</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="referent_id" class="form-label">Referent</label>
+                                <select class="form-select" id="referent_id" name="referent_id">
+                                    <option value="">-- Selectionner --</option>
+                                    {% for referent in referents %}
+                                    <option value="{{ referent.id }}">{{ referent.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="address" class="form-label">Adresse</label>
+                            <input type="text" class="form-control" id="address" name="address">
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="postal_code" class="form-label">Code Postal</label>
+                                <input type="text" class="form-control" id="postal_code" name="postal_code">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="city" class="form-label">Ville</label>
+                                <input type="text" class="form-control" id="city" name="city">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="region" class="form-label">Region</label>
+                                <input type="text" class="form-control" id="region" name="region">
+                            </div>
+                        </div>
+                        
+                        <input type="hidden" id="latitude" name="latitude">
+                        <input type="hidden" id="longitude" name="longitude">
+                        
+                        <div class="mb-3">
+                            <label for="phone" class="form-label">Telephone</label>
+                            <input type="tel" class="form-control" id="phone" name="phone">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="email" name="email">
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Creer
+                            </button>
+                            <a href="{{ url_for('pharmacies.index') }}" class="btn btn-outline-secondary">
+                                Annuler
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-map-marked-alt"></i> Carte</h5>
+                </div>
+                <div class="card-body p-0" style="height: 600px;">
+                    <div id="map" style="width: 100%; height: 100%;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    const map = L.map('map').setView([46.2276, 2.2137], 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: 'OSM'
+    }).addTo(map);
+    
+    let marker = null;
+    
+    map.on('click', function(e) {
+        if (marker) map.removeLayer(marker);
+        marker = L.marker(e.latlng).addTo(map);
+        document.getElementById('latitude').value = e.latlng.lat.toFixed(6);
+        document.getElementById('longitude').value = e.latlng.lng.toFixed(6);
+    });
+</script>
+{% endblock %}''',
+
+    'pharmacies/edit.html': '''{% extends 'base.html' %}
+
+{% block title %}Modifier Pharmacie - Dermo-CRM{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card shadow">
+                <div class="card-header bg-warning text-dark">
+                    <h4 class="mb-0"><i class="fas fa-edit"></i> Modifier {{ pharmacy.name }}</h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Nom *</label>
+                            <input type="text" class="form-control" id="name" name="name" value="{{ pharmacy.name }}" required>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="type" class="form-label">Type</label>
+                                <select class="form-select" id="type" name="type">
+                                    <option value="pharmacie" {% if pharmacy.type == 'pharmacie' %}selected{% endif %}>Pharmacie</option>
+                                    <option value="parapharmacie" {% if pharmacy.type == 'parapharmacie' %}selected{% endif %}>Parapharmacie</option>
+                                    <option value="hopital" {% if pharmacy.type == 'hopital' %}selected{% endif %}>Hopital</option>
+                                    <option value="clinique" {% if pharmacy.type == 'clinique' %}selected{% endif %}>Clinique</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="referent_id" class="form-label">Referent</label>
+                                <select class="form-select" id="referent_id" name="referent_id">
+                                    <option value="">-- Selectionner --</option>
+                                    {% for referent in referents %}
+                                    <option value="{{ referent.id }}" {% if pharmacy.referent_id == referent.id %}selected{% endif %}>
+                                        {{ referent.name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="address" class="form-label">Adresse</label>
+                            <input type="text" class="form-control" id="address" name="address" value="{{ pharmacy.address or '' }}">
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="postal_code" class="form-label">Code Postal</label>
+                                <input type="text" class="form-control" id="postal_code" name="postal_code" value="{{ pharmacy.postal_code or '' }}">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="city" class="form-label">Ville</label>
+                                <input type="text" class="form-control" id="city" name="city" value="{{ pharmacy.city or '' }}">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="region" class="form-label">Region</label>
+                                <input type="text" class="form-control" id="region" name="region" value="{{ pharmacy.region or '' }}">
+                            </div>
+                        </div>
+                        
+                        <input type="hidden" id="latitude" name="latitude" value="{{ pharmacy.latitude or '' }}">
+                        <input type="hidden" id="longitude" name="longitude" value="{{ pharmacy.longitude or '' }}">
+                        
+                        <div class="mb-3">
+                            <label for="phone" class="form-label">Telephone</label>
+                            <input type="tel" class="form-control" id="phone" name="phone" value="{{ pharmacy.phone or '' }}">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="email" name="email" value="{{ pharmacy.email or '' }}">
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-warning">
+                                <i class="fas fa-save"></i> Enregistrer
+                            </button>
+                            <a href="{{ url_for('pharmacies.index') }}" class="btn btn-outline-secondary">
+                                Annuler
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-map-marked-alt"></i> Position</h5>
+                </div>
+                <div class="card-body p-0" style="height: 600px;">
+                    <div id="map" style="width: 100%; height: 100%;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    const existingLat = {{ pharmacy.latitude | default('null', true) }};
+    const existingLng = {{ pharmacy.longitude | default('null', true) }};
+    const defaultLat = existingLat || 46.2276;
+    const defaultLng = existingLng || 2.2137;
+    const defaultZoom = existingLat ? 15 : 6;
+    
+    const map = L.map('map').setView([defaultLat, defaultLng], defaultZoom);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: 'OSM'
+    }).addTo(map);
+    
+    let marker = null;
+    
+    if (existingLat && existingLng) {
+        marker = L.marker([existingLat, existingLng]).addTo(map);
+    }
+    
+    map.on('click', function(e) {
+        if (marker) map.removeLayer(marker);
+        marker = L.marker(e.latlng).addTo(map);
+        document.getElementById('latitude').value = e.latlng.lat.toFixed(6);
+        document.getElementById('longitude').value = e.latlng.lng.toFixed(6);
+    });
+</script>
+{% endblock %}''',
+
+    'campaigns/detail.html': '''{% extends 'base.html' %}
+
+{% block title %}{{ campaign.name }} - Dermo-CRM{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-bullhorn text-primary"></i> {{ campaign.name }}</h2>
+            <p class="text-muted mb-0">
+                <span class="badge bg-secondary">{{ campaign.status }}</span>
+                {% if campaign.start_date and campaign.end_date %}
+                | Du {{ campaign.start_date.strftime('%d/%m/%Y') }} au {{ campaign.end_date.strftime('%d/%m/%Y') }}
+                {% endif %}
+            </p>
+        </div>
+        <div>
+            <a href="{{ url_for('campaigns.edit', id=campaign.id) }}" class="btn btn-warning">
+                <i class="fas fa-edit"></i> Modifier
+            </a>
+            <a href="{{ url_for('campaigns.index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Retour
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card shadow mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> Informations</h5>
+                </div>
+                <div class="card-body">
+                    {% if campaign.description %}
+                    <p>{{ campaign.description }}</p>
+                    <hr>
+                    {% endif %}
+                    
+                    {% if campaign.objectives %}
+                    <h6>Objectifs</h6>
+                    <p class="text-muted">{{ campaign.objectives }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-clinic-medical"></i> Pharmacies</h5>
+                </div>
+                <div class="card-body">
+                    {% if campaign.pharmacies %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Pharmacie</th>
+                                    <th>Ville</th>
+                                    <th>Statut</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for cp in campaign.pharmacies %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ url_for('pharmacies.detail', id=cp.pharmacy.id) }}">
+                                            {{ cp.pharmacy.name }}
+                                        </a>
+                                    </td>
+                                    <td>{{ cp.pharmacy.city or '-' }}</td>
+                                    <td>{{ cp.status or '-' }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center mb-0">Aucune pharmacy</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}'''
+}
+
+# Ecrire uniquement ces 3 fichiers
+for filepath, content in files_to_fix.items():
+    full_path = os.path.join(base_dir, filepath)
+    folder = os.path.dirname(full_path)
+    os.makedirs(folder, exist_ok=True)
+    
+    with open(full_path, 'w', encoding='utf-8') as f:
+        f.write(content)
+    print(f"Repare: {filepath}")
+
+print("\nTermine. Redemarrez Flask.")

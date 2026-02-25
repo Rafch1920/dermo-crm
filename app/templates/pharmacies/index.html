@@ -1,0 +1,150 @@
+{% extends 'base.html' %}
+
+{% block title %}Pharmacies - Dermo-CRM{% endblock %}
+{% block page_title %}Liste des Pharmacies{% endblock %}
+
+{% block content %}
+<!-- Actions -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('pharmacies.create') }}" class="btn btn-success">
+            <i class="bi bi-plus-lg"></i> Nouvelle pharmacie
+        </a>
+        <a href="{{ url_for('pharmacies.map_view') }}" class="btn btn-primary">
+            <i class="bi bi-map"></i> Voir la carte
+        </a>
+    </div>
+    <form class="d-flex gap-2" method="GET">
+        <input type="text" name="search" class="form-control" placeholder="Rechercher..." value="{{ search }}">
+        <select name="region" class="form-select" style="width: 150px;">
+            <option value="">Toutes régions</option>
+            {% for r in regions %}
+            <option value="{{ r }}" {% if r == region_filter %}selected{% endif %}>{{ r }}</option>
+            {% endfor %}
+        </select>
+        <select name="referent_id" class="form-select" style="width: 150px;">
+            <option value="">Tous référents</option>
+            {% for ref in referents %}
+            <option value="{{ ref.id }}" {% if ref.id == referent_filter %}selected{% endif %}>{{ ref.name }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-outline-primary">
+            <i class="bi bi-search"></i>
+        </button>
+    </form>
+</div>
+
+<!-- Table -->
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Nom</th>
+                    <th>Type</th>
+                    <th>Ville</th>
+                    <th>Région</th>
+                    <th>Référent</th>
+                    <th>Visites</th>
+                    <th>Dernière visite</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pharmacy in pharmacies.items %}
+                <tr>
+                    <td>
+                        <strong>{{ pharmacy.name }}</strong>
+                        {% if pharmacy.phone %}
+                        <br><small class="text-muted"><i class="bi bi-telephone"></i> {{ pharmacy.phone }}</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge badge-{{ pharmacy.type }}">
+                            {{ pharmacy.type }}
+                        </span>
+                    </td>
+                    <td>{{ pharmacy.city or '-' }}</td>
+                    <td>{{ pharmacy.region or '-' }}</td>
+                    <td>
+                        {% if pharmacy.referent %}
+                        <span style="color: {{ pharmacy.referent.color }}">
+                            <i class="bi bi-person-circle"></i> {{ pharmacy.referent.name }}
+                        </span>
+                        {% else %}
+                        -
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge bg-secondary">{{ pharmacy.get_visit_count() }}</span>
+                    </td>
+                    <td>
+                        {% set last = pharmacy.get_last_visit() %}
+                        {% if last %}
+                        {{ last.visit_date.strftime('%d/%m/%Y') }}
+                        {% else %}
+                        <span class="text-muted">Jamais</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <a href="{{ url_for('pharmacies.detail', id=pharmacy.id) }}" class="btn btn-outline-primary" title="Voir">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                            <a href="{{ url_for('visits.create', pharmacy_id=pharmacy.id) }}" class="btn btn-outline-success" title="Nouvelle visite">
+                                <i class="bi bi-plus-lg"></i>
+                            </a>
+                            <a href="{{ url_for('pharmacies.edit', id=pharmacy.id) }}" class="btn btn-outline-warning" title="Modifier">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" class="text-center text-muted py-4">
+                        <i class="bi bi-inbox" style="font-size: 2rem;"></i>
+                        <p class="mb-0">Aucune pharmacie trouvée</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Pagination -->
+    {% if pharmacies.pages > 1 %}
+    <div class="card-footer">
+        <nav>
+            <ul class="pagination justify-content-center mb-0">
+                {% if pharmacies.has_prev %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('pharmacies.index', page=pharmacies.prev_num, search=search, region=region_filter, referent_id=referent_filter) }}">Précédent</a>
+                </li>
+                {% endif %}
+                
+                {% for page_num in pharmacies.iter_pages(left_edge=2, left_current=2, right_current=3, right_edge=2) %}
+                    {% if page_num %}
+                        {% if page_num == pharmacies.page %}
+                        <li class="page-item active"><span class="page-link">{{ page_num }}</span></li>
+                        {% else %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('pharmacies.index', page=page_num, search=search, region=region_filter, referent_id=referent_filter) }}">{{ page_num }}</a>
+                        </li>
+                        {% endif %}
+                    {% else %}
+                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if pharmacies.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('pharmacies.index', page=pharmacies.next_num, search=search, region=region_filter, referent_id=referent_filter) }}">Suivant</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

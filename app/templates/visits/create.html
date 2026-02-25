@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+
+{% block title %}Nouvelle Visite - Dermo-CRM{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fas fa-calendar-plus"></i> Nouvelle Visite</h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" id="visitForm">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        
+                        <div class="mb-3">
+                            <label for="pharmacy_id" class="form-label">Pharmacie *</label>
+                            <select class="form-select" id="pharmacy_id" name="pharmacy_id" required>
+                                <option value="">-- Selectionner une pharmacie --</option>
+                                {% for pharmacy in pharmacies %}
+                                <option value="{{ pharmacy.id }}">{{ pharmacy.name }} {% if pharmacy.city %}({{ pharmacy.city }}){% endif %}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="visit_date" class="form-label">Date *</label>
+                                <input type="date" class="form-control" id="visit_date" name="visit_date" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="visit_time" class="form-label">Heure</label>
+                                <input type="time" class="form-control" id="visit_time" name="visit_time">
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="visit_type" class="form-label">Type de visite</label>
+                                <select class="form-select" id="visit_type" name="visit_type">
+                                    <option value="planifiee">Planifiee</option>
+                                    <option value="ponctuelle">Ponctuelle</option>
+                                    <option value="annuelle">Annuelle</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="duration" class="form-label">Duree (minutes)</label>
+                                <input type="number" class="form-control" id="duration" name="duration" min="1" max="480">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="objectives" class="form-label">Objectifs</label>
+                            <textarea class="form-control" id="objectives" name="objectives" rows="2"></textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="report" class="form-label">Compte rendu</label>
+                            <textarea class="form-control" id="report" name="report" rows="4"></textarea>
+                        </div>
+                        
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{{ url_for('visits.index') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-times"></i> Annuler
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Enregistrer
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,169 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ campaign.name }} - Dermo-CRM{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-bullhorn text-primary"></i> {{ campaign.name }}</h2>
+            <p class="text-muted mb-0">
+                <span class="badge bg-{{ 'success' if campaign.status == 'active' else 'warning' if campaign.status == 'paused' else 'secondary' if campaign.status == 'draft' else 'dark' }} fs-6">
+                    {{ campaign.status }}
+                </span>
+                {% if campaign.start_date and campaign.end_date %}
+                | Du {{ campaign.start_date.strftime('%d/%m/%Y') }} au {{ campaign.end_date.strftime('%d/%m/%Y') }}
+                {% endif %}
+            </p>
+        </div>
+        <div>
+            <a href="{{ url_for('campaigns.edit', id=campaign.id) }}" class="btn btn-warning">
+                <i class="fas fa-edit"></i> Modifier
+            </a>
+            <a href="{{ url_for('campaigns.index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Retour
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Statistiques -->
+        <div class="col-md-4">
+            <!-- Barre de progression principale -->
+            <div class="card shadow mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-chart-bar"></i> Progression</h5>
+                </div>
+                <div class="card-body text-center">
+                    <div class="display-4 fw-bold text-success mb-2">{{ stats.progress }}%</div>
+                    <div class="progress mb-3" style="height: 30px;">
+                        <div class="progress-bar bg-success" role="progressbar" style="width: {{ stats.progress }}%"></div>
+                    </div>
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <div class="h4 mb-0 text-success">{{ stats.completed }}</div>
+                            <small class="text-muted">Terminees</small>
+                        </div>
+                        <div class="col-4">
+                            <div class="h4 mb-0 text-warning">{{ stats.in_progress }}</div>
+                            <small class="text-muted">En cours</small>
+                        </div>
+                        <div class="col-4">
+                            <div class="h4 mb-0 text-secondary">{{ stats.pending }}</div>
+                            <small class="text-muted">A faire</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Informations -->
+            <div class="card shadow mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> Informations</h5>
+                </div>
+                <div class="card-body">
+                    {% if campaign.description %}
+                    <p>{{ campaign.description }}</p>
+                    {% endif %}
+                    
+                    {% if campaign.objectives %}
+                    <h6><i class="fas fa-bullseye"></i> Objectifs</h6>
+                    <p class="text-muted">{{ campaign.objectives }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Ajouter des pharmacies -->
+            {% if available_pharmacies %}
+            <div class="card shadow">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-plus"></i> Ajouter des pharmacies</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('campaigns.add_pharmacies', id=campaign.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        
+                        <div class="mb-3">
+                            <select class="form-select" name="pharmacy_ids" multiple size="5" required>
+                                {% for pharmacy in available_pharmacies %}
+                                <option value="{{ pharmacy.id }}">
+                                    {{ pharmacy.name }} {% if pharmacy.city %}({{ pharmacy.city }}){% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">Maintenez Ctrl pour selectionner plusieurs</small>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-success w-100">
+                            <i class="fas fa-plus"></i> Ajouter
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Liste des pharmacies -->
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-clinic-medical"></i> Pharmacies ({{ stats.total }})</h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if campaign.pharmacy_assignments %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Pharmacie</th>
+                                    <th>Ville</th>
+                                    <th>Statut</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for pc in campaign.pharmacy_assignments %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ url_for('pharmacies.detail', id=pc.pharmacy.id) }}">
+                                            <strong>{{ pc.pharmacy.name }}</strong>
+                                        </a>
+                                    </td>
+                                    <td>{{ pc.pharmacy.city or '-' }}</td>
+                                    <td>
+                                        <form method="POST" action="{{ url_for('campaigns.update_pharmacy_status', campaign_id=campaign.id, pharmacy_id=pc.pharmacy.id) }}" class="d-inline">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <select class="form-select form-select-sm" name="status" onchange="this.form.submit()" 
+                                                    style="width: auto; display: inline-block;">
+                                                <option value="pending" {% if pc.status == 'pending' %}selected{% endif %} class="text-secondary">A faire</option>
+                                                <option value="in_progress" {% if pc.status == 'in_progress' %}selected{% endif %} class="text-warning">En cours</option>
+                                                <option value="completed" {% if pc.status == 'completed' %}selected{% endif %} class="text-success">Terminee</option>
+                                            </select>
+                                        </form>
+                                    </td>
+                                    <td>
+                                        <form method="POST" action="{{ url_for('campaigns.remove_pharmacy', campaign_id=campaign.id, pharmacy_id=pc.pharmacy.id) }}" class="d-inline" onsubmit="return confirm('Retirer cette pharmacie ?');">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="btn btn-sm btn-danger">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-clinic-medical fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">Aucune pharmacy assignee</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

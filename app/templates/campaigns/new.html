@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+
+{% block title %}Nouvelle Campagne - Dermo-CRM{% endblock %}
+{% block page_title %}Nouvelle Campagne{% endblock %}
+
+{% block extra_css %}
+<style>
+    .pharmacy-card {
+        border: 2px solid #e9ecef;
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 10px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .pharmacy-card:hover {
+        border-color: #3498db;
+        background: #f8f9fa;
+    }
+    .pharmacy-card.selected {
+        border-color: #2ecc71;
+        background: #d4edda;
+    }
+    .pharmacy-card input[type="checkbox"] {
+        display: none;
+    }
+    .filter-section {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <form method="POST" id="campaignForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Informations generales</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Nom de la campagne *</label>
+                        <input type="text" name="name" class="form-control" required>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Date de debut *</label>
+                            <input type="date" name="start_date" class="form-control" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Date de fin *</label>
+                            <input type="date" name="end_date" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea name="description" class="form-control" rows="3"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Selection des pharmacies</h5>
+                    <span class="badge bg-primary" id="selectedCount">0 selectionnee(s)</span>
+                </div>
+                <div class="card-body">
+                    <div class="filter-section">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <input type="text" id="searchName" class="form-control" placeholder="Rechercher par nom...">
+                            </div>
+                            <div class="col-md-2">
+                                <select id="filterReferent" class="form-select">
+                                    <option value="">Referent</option>
+                                    {% for r in referents %}
+                                    <option value="{{ r.id }}">{{ r.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <select id="filterRegion" class="form-select">
+                                    <option value="">Region</option>
+                                    {% for region in regions %}
+                                    <option value="{{ region }}">{{ region }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <select id="filterType" class="form-select">
+                                    <option value="">Type</option>
+                                    <option value="pharmacie">Pharmacie</option>
+                                    <option value="parapharmacie">Parapharmacie</option>
+                                    <option value="grande_surface">Grande surface</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <input type="text" id="filterZone" class="form-control" placeholder="Ville/Zone...">
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="selectAllVisible()">
+                                Tout selectionner (visibles)
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="deselectAll()">
+                                Tout deselectionner
+                            </button>
+                            <button type="button" class="btn btn-outline-info btn-sm" onclick="resetFilters()">
+                                Reinitialiser filtres
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="pharmaciesList" style="max-height: 500px; overflow-y: auto;">
+                        {% for pharmacy in pharmacies %}
+                        <div class="pharmacy-card" data-id="{{ pharmacy.id }}" 
+                             data-referent="{{ pharmacy.referent_id or '' }}"
+                             data-region="{{ pharmacy.region or '' }}"
+                             data-type="{{ pharmacy.type }}"
+                             data-zone="{{ pharmacy.city or '' }}"
+                             data-name="{{ pharmacy.name.lower() }}">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="form-check">
+                                        <input class="form-check-input pharmacy-checkbox" type="checkbox" 
+                                               name="pharmacy_ids[]" value="{{ pharmacy.id }}" id="pharm_{{ pharmacy.id }}">
+                                        <label class="form-check-label fw-bold" for="pharm_{{ pharmacy.id }}">
+                                            {{ pharmacy.name }}
+                                            <span class="badge bg-primary ms-2">{{ pharmacy.type }}</span>
+                                        </label>
+                                    </div>
+                                    <small class="text-muted ms-4">
+                                        {{ pharmacy.city or '-' }}, {{ pharmacy.region or '-' }}
+                                        {% if pharmacy.referent_obj %}
+                                        | {{ pharmacy.referent_obj.name }}
+                                        {% endif %}
+                                    </small>
+                                </div>
+                                <i class="bi bi-check-circle-fill text-success d-none check-icon"></i>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Produits de la campagne</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for product in products %}
+                        <div class="col-md-4 mb-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="product_ids[]" 
+                                       value="{{ product.id }}" id="prod_{{ product.id }}">
+                                <label class="form-check-label" for="prod_{{ product.id }}">
+                                    {{ product.name }}
+                                </label>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end mb-4">
+                <a href="{{ url_for('campaigns.index') }}" class="btn btn-secondary">Annuler</a>
+                <button type="submit" class="btn btn-primary btn-lg">Creer la campagne</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function filterPharmacies() {
+        const search = document.getElementById('searchName').value.toLowerCase();
+        const referent = document.getElementById('filterReferent').value;
+        const region = document.getElementById('filterRegion').value;
+        const type = document.getElementById('filterType').value;
+        const zone = document.getElementById('filterZone').value.toLowerCase();
+
+        document.querySelectorAll('.pharmacy-card').forEach(card => {
+            const matchSearch = !search || card.dataset.name.includes(search);
+            const matchReferent = !referent || card.dataset.referent === referent;
+            const matchRegion = !region || card.dataset.region === region;
+            const matchType = !type || card.dataset.type === type;
+            const matchZone = !zone || card.dataset.zone.toLowerCase().includes(zone);
+
+            card.style.display = (matchSearch && matchReferent && matchRegion && matchType && matchZone) ? 'block' : 'none';
+        });
+    }
+
+    function selectAllVisible() {
+        document.querySelectorAll('.pharmacy-card:not([style*="none"])').forEach(card => {
+            const checkbox = card.querySelector('.pharmacy-checkbox');
+            checkbox.checked = true;
+            card.classList.add('selected');
+            card.querySelector('.check-icon').classList.remove('d-none');
+        });
+        updateCount();
+    }
+
+    function deselectAll() {
+        document.querySelectorAll('.pharmacy-checkbox').forEach(checkbox => {
+            checkbox.checked = false;
+            checkbox.closest('.pharmacy-card').classList.remove('selected');
+            checkbox.closest('.pharmacy-card').querySelector('.check-icon').classList.add('d-none');
+        });
+        updateCount();
+    }
+
+    function resetFilters() {
+        document.getElementById('searchName').value = '';
+        document.getElementById('filterReferent').value = '';
+        document.getElementById('filterRegion').value = '';
+        document.getElementById('filterType').value = '';
+        document.getElementById('filterZone').value = '';
+        filterPharmacies();
+    }
+
+    function updateCount() {
+        const count = document.querySelectorAll('.pharmacy-checkbox:checked').length;
+        document.getElementById('selectedCount').textContent = count + ' selectionnee(s)';
+    }
+
+    document.querySelectorAll('.pharmacy-card').forEach(card => {
+        card.addEventListener('click', function(e) {
+            if (e.target.type !== 'checkbox') {
+                const checkbox = this.querySelector('.pharmacy-checkbox');
+                checkbox.checked = !checkbox.checked;
+            }
+            
+            const checkbox = this.querySelector('.pharmacy-checkbox');
+            if (checkbox.checked) {
+                this.classList.add('selected');
+                this.querySelector('.check-icon').classList.remove('d-none');
+            } else {
+                this.classList.remove('selected');
+                this.querySelector('.check-icon').classList.add('d-none');
+            }
+            updateCount();
+        });
+    });
+
+    ['searchName', 'filterReferent', 'filterRegion', 'filterType', 'filterZone'].forEach(id => {
+        document.getElementById(id).addEventListener('input', filterPharmacies);
+        document.getElementById(id).addEventListener('change', filterPharmacies);
+    });
+
+    document.getElementById('campaignForm').addEventListener('submit', function(e) {
+        const selected = document.querySelectorAll('.pharmacy-checkbox:checked').length;
+        if (selected === 0) {
+            e.preventDefault();
+            alert('Veuillez selectionner au moins une pharmacie');
+            return false;
+        }
+    });
+</script>
+{% endblock %}

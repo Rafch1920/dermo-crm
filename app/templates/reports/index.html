@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+
+{% block title %}Rapports - Dermo-CRM{% endblock %}
+{% block page_title %}Génération de Rapports{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Rapport de visites -->
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="bi bi-calendar-check"></i> Rapport de visites
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('reports.generate') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="report_type" value="visits">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Date de début</label>
+                        <input type="date" class="form-control" name="start_date">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Date de fin</label>
+                        <input type="date" class="form-control" name="end_date">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Référent (optionnel)</label>
+                        <select class="form-select" name="referent_id">
+                            <option value="">Tous les référents</option>
+                            {% for referent in referents %}
+                            <option value="{{ referent.id }}">{{ referent.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-file-earmark-pdf"></i> Générer le PDF
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Rapport de campagne -->
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="bi bi-bullseye"></i> Rapport de campagne
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('reports.generate') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="report_type" value="campaign">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Campagne *</label>
+                        <select class="form-select" name="campaign_id" required>
+                            <option value="">-- Sélectionner --</option>
+                            {% for campaign in campaigns %}
+                            <option value="{{ campaign.id }}">{{ campaign.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> Ce rapport inclut :
+                        <ul class="mb-0 mt-2">
+                            <li>Détails de la campagne</li>
+                            <li>Pharmacies inscrites</li>
+                            <li>Avancement global</li>
+                            <li>Statistiques par zone</li>
+                        </ul>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-file-earmark-pdf"></i> Générer le PDF
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Rapport par zone -->
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="bi bi-geo-alt"></i> Rapport par zone
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('reports.generate') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="report_type" value="zone">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Région *</label>
+                        <select class="form-select" name="region" required>
+                            <option value="">-- Sélectionner --</option>
+                            {% for region in regions %}
+                            <option value="{{ region }}">{{ region }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> Ce rapport inclut :
+                        <ul class="mb-0 mt-2">
+                            <li>Liste des pharmacies</li>
+                            <li>Nombre de visites</li>
+                            <li>Référents associés</li>
+                            <li>Couverture du territoire</li>
+                        </ul>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-file-earmark-pdf"></i> Générer le PDF
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %}Modifier {{ campaign.name }} - Dermo-CRM{% endblock %}
+{% block page_title %}Modifier Campagne{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <form method="POST" id="editForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Informations de la campagne</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Nom *</label>
+                        <input type="text" name="name" class="form-control" value="{{ campaign.name }}" required>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Date de debut *</label>
+                            <input type="date" name="start_date" class="form-control" 
+                                   value="{{ campaign.start_date.strftime('%Y-%m-%d') }}" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Date de fin *</label>
+                            <input type="date" name="end_date" class="form-control" 
+                                   value="{{ campaign.end_date.strftime('%Y-%m-%d') }}" required>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Statut</label>
+                        <select name="status" class="form-select">
+                            <option value="active" {% if campaign.status == 'active' %}selected{% endif %}>Active</option>
+                            <option value="paused" {% if campaign.status == 'paused' %}selected{% endif %}>En pause</option>
+                            <option value="completed" {% if campaign.status == 'completed' %}selected{% endif %}>Terminee</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea name="description" class="form-control" rows="3">{{ campaign.description or '' }}</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NOUVEAU: Section Pharmacies -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-shop"></i> Pharmacies dans la campagne</h5>
+                    <span class="badge bg-primary">{{ existing_pharmacies|length }}</span>
+                </div>
+                <div class="card-body">
+                    {% if existing_pharmacies %}
+                    <div class="table-responsive mb-4">
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Pharmacie</th>
+                                    <th>Ville</th>
+                                    <th>Statut</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for link in existing_pharmacies %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ link.pharmacy.name }}</strong>
+                                        {% if link.pharmacy.email %}
+                                        <br><small class="text-muted">{{ link.pharmacy.email }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ link.pharmacy.city or '-' }}</td>
+                                    <td>
+                                        <span class="badge bg-{{ 'success' if link.status == 'done' else 'info' if link.status == 'scheduled' else 'warning' if link.status == 'pending' else 'danger' if link.status == 'problem' else 'dark' }}">
+                                            {% if link.status == 'done' %}Fait{% endif %}
+                                            {% if link.status == 'scheduled' %}Programme{% endif %}
+                                            {% if link.status == 'pending' %}En attente{% endif %}
+                                            {% if link.status == 'problem' %}Probleme{% endif %}
+                                            {% if link.status == 'cancelled' %}Annule{% endif %}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" 
+                                                onclick="removePharmacyEdit({{ link.id }})">
+                                            <i class="bi bi-trash"></i> Retirer
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">Aucune pharmacie dans cette campagne</div>
+                    {% endif %}
+                    
+                    <!-- Ajouter de nouvelles pharmacies -->
+                    {% if available_pharmacies %}
+                    <hr>
+                    <h6 class="mb-3"><i class="bi bi-plus-lg"></i> Ajouter des pharmacies</h6>
+                    <div class="pharmacy-selector border rounded p-3" style="max-height: 300px; overflow-y: auto;">
+                        <input type="text" class="form-control form-control-sm mb-2" 
+                               placeholder="Rechercher..." onkeyup="filterAvailablePharmacies(this)">
+                        
+                        {% for pharmacy in available_pharmacies %}
+                        <div class="form-check pharmacy-item-edit">
+                            <input class="form-check-input" type="checkbox" name="new_pharmacy_ids[]" 
+                                   value="{{ pharmacy.id }}" id="newpharm{{ pharmacy.id }}">
+                            <label class="form-check-label" for="newpharm{{ pharmacy.id }}">
+                                <strong>{{ pharmacy.name }}</strong>
+                                <small class="text-muted d-block">{{ pharmacy.city or 'Ville non renseignee' }} - {{ pharmacy.address or 'Adresse non renseignee' }}</small>
+                            </label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="alert alert-secondary mt-3">Toutes les pharmacies sont deja dans cette campagne</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-box"></i> Produits de la campagne</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for product in products %}
+                        <div class="col-md-4 mb-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="product_ids[]" 
+                                       value="{{ product.id }}" id="prod_{{ product.id }}"
+                                       {% if product.id in selected_products %}checked{% endif %}>
+                                <label class="form-check-label" for="prod_{{ product.id }}">
+                                    {{ product.name }}
+                                </label>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end mb-4">
+                <a href="{{ url_for('campaigns.view', id=campaign.id) }}" class="btn btn-secondary">Annuler</a>
+                <button type="submit" class="btn btn-warning btn-lg">Enregistrer les modifications</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function filterAvailablePharmacies(input) {
+    const search = input.value.toLowerCase();
+    document.querySelectorAll('.pharmacy-item-edit').forEach(item => {
+        const text = item.textContent.toLowerCase();
+        item.style.display = text.includes(search) ? 'block' : 'none';
+    });
+}
+
+function removePharmacyEdit(linkId) {
+    if (!confirm('Retirer cette pharmacie de la campagne ?')) return;
+    
+    fetch('/campaigns/{{ campaign.id }}/remove_pharmacy', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify({link_id: linkId})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert(data.error || 'Erreur');
+        }
+    });
+}
+</script>
+{% endblock %}

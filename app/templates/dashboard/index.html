@@ -1,0 +1,608 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Dermo-CRM{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ============================================
+   NOTIFICATIONS RDV - COMPACT + PAGINATION
+   ============================================ */
+
+.appointment-ticker {
+    background: linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%);
+    border-radius: 16px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+    border: 1px solid rgba(0,0,0,0.04);
+    max-height: 520px;
+    display: flex;
+    flex-direction: column;
+}
+
+.appointment-ticker-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #e9ecef;
+    font-weight: 700;
+    color: #2c3e50;
+    font-size: 0.95rem;
+    flex-shrink: 0;
+}
+
+.appointment-ticker-header i {
+    color: #e74c3c;
+    font-size: 1rem;
+    animation: pulse-bell 2s ease-in-out infinite;
+}
+
+@keyframes pulse-bell {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+.appointment-count {
+    margin-left: auto;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 12px;
+    font-weight: 600;
+}
+
+.appointment-list {
+    overflow-y: auto;
+    flex: 1;
+    max-height: 400px;
+    padding-right: 4px;
+}
+
+.appointment-list::-webkit-scrollbar {
+    width: 4px;
+}
+
+.appointment-list::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.appointment-list::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+}
+
+.appointment-list::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+.appointment-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 0.75rem;
+    margin-bottom: 0.5rem;
+    border-radius: 10px;
+    background: white;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    transition: all 0.2s ease;
+    border-left: 4px solid transparent;
+    min-height: 60px;
+}
+
+.appointment-item:last-child {
+    margin-bottom: 0;
+}
+
+.appointment-item:hover {
+    transform: translateX(-4px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.appointment-green {
+    border-left-color: #27ae60;
+    background: linear-gradient(to right, rgba(39, 174, 96, 0.05), white);
+}
+
+.appointment-green .appointment-days {
+    background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+}
+
+.appointment-orange {
+    border-left-color: #f39c12;
+    background: linear-gradient(to right, rgba(243, 156, 18, 0.06), white);
+}
+
+.appointment-orange .appointment-days {
+    background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+}
+
+.appointment-red {
+    border-left-color: #e74c3c;
+    background: linear-gradient(to right, rgba(231, 76, 60, 0.08), white);
+    animation: urgent-pulse 2s ease-in-out infinite;
+}
+
+@keyframes urgent-pulse {
+    0%, 100% { box-shadow: 0 1px 4px rgba(231, 76, 60, 0.1); }
+    50% { box-shadow: 0 2px 8px rgba(231, 76, 60, 0.2); }
+}
+
+.appointment-red .appointment-days {
+    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+    animation: pulse-red 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-red {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+.appointment-days {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    font-weight: 800;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    flex-shrink: 0;
+    color: white;
+}
+
+.appointment-days .days-number {
+    font-size: 1.1rem;
+    line-height: 1;
+    margin-bottom: 1px;
+}
+
+.appointment-days .days-label {
+    font-size: 0.55rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    opacity: 0.95;
+    font-weight: 600;
+}
+
+.appointment-content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.appointment-content strong {
+    color: #2c3e50;
+    font-size: 0.85rem;
+    font-weight: 700;
+    margin-bottom: 0.15rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
+}
+
+.appointment-content .campaign-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.7rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 12px;
+    background: rgba(102, 126, 234, 0.1);
+    color: #667eea;
+    font-weight: 600;
+    margin-bottom: 0.15rem;
+    width: fit-content;
+}
+
+.appointment-content .date-text {
+    font-size: 0.75rem;
+    color: #6c757d;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-weight: 500;
+}
+
+.appointment-pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #e9ecef;
+    flex-shrink: 0;
+}
+
+.appointment-pagination .page-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    background: white;
+    border: 1px solid #dee2e6;
+    color: #495057;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.appointment-pagination .page-btn:hover {
+    background: #e9ecef;
+    border-color: #adb5bd;
+}
+
+.appointment-pagination .page-btn.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-color: transparent;
+}
+
+.appointment-pagination .page-btn:disabled,
+.appointment-pagination .page-btn.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.appointment-pagination .page-info {
+    font-size: 0.75rem;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.appointment-empty {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: #95a5a6;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.appointment-empty i {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    opacity: 0.4;
+}
+
+.appointment-empty p {
+    font-size: 0.85rem;
+    margin: 0;
+    font-weight: 500;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- KPI Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="kpi-card">
+            <div class="kpi-icon primary">
+                <i class="bi bi-calendar-check"></i>
+            </div>
+            <div>
+                <div class="kpi-value">{{ kpis.visits_this_month }}</div>
+                <div class="kpi-label">Visites ce mois</div>
+                {% if kpis.visits_evolution > 0 %}
+                    <small class="text-success"><i class="bi bi-arrow-up"></i> +{{ kpis.visits_evolution }}</small>
+                {% elif kpis.visits_evolution < 0 %}
+                    <small class="text-danger"><i class="bi bi-arrow-down"></i> {{ kpis.visits_evolution }}</small>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="kpi-card">
+            <div class="kpi-icon success">
+                <i class="bi bi-shop"></i>
+            </div>
+            <div>
+                <div class="kpi-value">{{ kpis.total_pharmacies }}</div>
+                <div class="kpi-label">Pharmacies actives</div>
+                <small class="text-muted">+{{ kpis.new_pharmacies }} ce mois</small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="kpi-card">
+            <div class="kpi-icon warning">
+                <i class="bi bi-graph-up"></i>
+            </div>
+            <div>
+                <div class="kpi-value">{{ kpis.coverage_rate }}%</div>
+                <div class="kpi-label">Taux de couverture</div>
+                <small class="text-muted">{{ kpis.visited_pharmacies }} visitees</small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="kpi-card">
+            <div class="kpi-icon danger">
+                <i class="bi bi-star"></i>
+            </div>
+            <div>
+                <div class="kpi-value">{{ kpis.avg_quality }}</div>
+                <div class="kpi-label">Qualite moyenne</div>
+                <small class="text-muted">/10</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Graphiques -->
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-bar-chart"></i> Visites des 6 derniers mois</span>
+            </div>
+            <div class="card-body">
+                <canvas id="visitsChart" height="100"></canvas>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="bi bi-pie-chart"></i> Repartition par region
+                    </div>
+                    <div class="card-body">
+                        <canvas id="regionChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="bi bi-trophy"></i> Top produits formes
+                    </div>
+                    <div class="card-body">
+                        <canvas id="productsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Sidebar droite -->
+    <div class="col-lg-4">
+        <!-- NOTIFICATIONS RDV CAMPAGNES -->
+        <div class="appointment-ticker">
+            <div class="appointment-ticker-header">
+                <i class="bi bi-bell-fill"></i>
+                <span>RDV Campagnes</span>
+                <span class="appointment-count">{{ total_appointments }}</span>
+            </div>
+            
+            {% if appointments %}
+                <div class="appointment-list">
+                    {% for appt in appointments %}
+                    <div class="appointment-item {{ appt.color_class }}">
+                        <div class="appointment-days">
+                            <span class="days-number">J-{{ appt.days_until }}</span>
+                            <span class="days-label">jours</span>
+                        </div>
+                        <div class="appointment-content">
+                            <strong>{{ appt.pharmacy_name }}</strong>
+                            <span class="campaign-badge">
+                                <i class="bi bi-bullseye"></i> {{ appt.campaign_name }}
+                            </span>
+                            <div class="date-text">
+                                <i class="bi bi-clock"></i>
+                                {{ appt.date.strftime('%d/%m %H:%M') }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                {% if total_pages > 1 %}
+                <div class="appointment-pagination">
+                    {% if appointment_page > 1 %}
+                        <a href="{{ url_for('dashboard.index', appt_page=appointment_page-1) }}" class="page-btn" title="Page precedente">
+                            <i class="bi bi-chevron-left"></i>
+                        </a>
+                    {% else %}
+                        <span class="page-btn disabled"><i class="bi bi-chevron-left"></i></span>
+                    {% endif %}
+                    
+                    <span class="page-info">{{ appointment_page }} / {{ total_pages }}</span>
+                    
+                    {% if appointment_page < total_pages %}
+                        <a href="{{ url_for('dashboard.index', appt_page=appointment_page+1) }}" class="page-btn" title="Page suivante">
+                            <i class="bi bi-chevron-right"></i>
+                        </a>
+                    {% else %}
+                        <span class="page-btn disabled"><i class="bi bi-chevron-right"></i></span>
+                    {% endif %}
+                </div>
+                {% endif %}
+                
+            {% else %}
+                <div class="appointment-empty">
+                    <i class="bi bi-calendar-check"></i>
+                    <p>Aucun rendez-vous prevu</p>
+                </div>
+            {% endif %}
+        </div>
+        
+        <!-- Campagnes actives -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <i class="bi bi-bullseye"></i> Campagnes actives
+            </div>
+            <div class="card-body">
+                {% if active_campaigns %}
+                    {% for campaign in active_campaigns %}
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <strong>{{ campaign.name }}</strong>
+                            <div class="text-muted small">
+                                J-{{ (campaign.end_date - today).days }} avant fin
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-primary">{{ campaign.get_progress() }}%</span>
+                        </div>
+                    </div>
+                    <div class="progress mb-3" style="height: 6px;">
+                        <div class="progress-bar" style="width: {{ campaign.get_progress() }}%"></div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted mb-0">Aucune campagne active</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Visites recentes -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between">
+                <span><i class="bi bi-clock-history"></i> Visites recentes</span>
+                <a href="{{ url_for('visits.index') }}" class="small">Voir tout</a>
+            </div>
+            <div class="list-group list-group-flush">
+                {% for visit in recent_visits %}
+                <a href="{{ url_for('visits.detail', id=visit.id) }}" class="list-group-item list-group-item-action">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <strong>{{ visit.pharmacy.name }}</strong>
+                            <div class="text-muted small">{{ visit.visit_date.strftime('%d/%m/%Y %H:%M') }}</div>
+                        </div>
+                        {% if visit.quality_score %}
+                        <span class="badge bg-{{ 'success' if visit.quality_score >= 8 else 'warning' if visit.quality_score >= 5 else 'danger' }}">
+                            {{ visit.quality_score }}/10
+                        </span>
+                        {% endif %}
+                    </div>
+                </a>
+                {% else %}
+                <div class="list-group-item text-muted">Aucune visite recente</div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <!-- Pharmacies sans visite -->
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-exclamation-triangle"></i> Sans visite recente
+            </div>
+            <div class="list-group list-group-flush">
+                {% for pharmacy in pharmacies_no_visit %}
+                <a href="{{ url_for('pharmacies.detail', id=pharmacy.id) }}" class="list-group-item list-group-item-action">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <strong>{{ pharmacy.name }}</strong>
+                            <div class="text-muted small">{{ pharmacy.city }}</div>
+                        </div>
+                        <span class="badge bg-secondary">{{ pharmacy.get_visit_count() }}</span>
+                    </div>
+                </a>
+                {% else %}
+                <div class="list-group-item text-muted">Toutes les pharmacies sont a jour</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const chartData = {{ chart_data | tojson }};
+
+const visitsCtx = document.getElementById('visitsChart').getContext('2d');
+new Chart(visitsCtx, {
+    type: 'bar',
+    data: {
+        labels: chartData.months,
+        datasets: [{
+            label: 'Visites',
+            data: chartData.visits,
+            backgroundColor: 'rgba(52, 152, 219, 0.8)',
+            borderColor: 'rgba(52, 152, 219, 1)',
+            borderWidth: 1,
+            borderRadius: 6
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: { display: false }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: { stepSize: 1 }
+            }
+        }
+    }
+});
+
+const regionCtx = document.getElementById('regionChart').getContext('2d');
+new Chart(regionCtx, {
+    type: 'doughnut',
+    data: {
+        labels: chartData.regions,
+        datasets: [{
+            data: chartData.region_counts,
+            backgroundColor: [
+                '#3498db', '#2ecc71', '#f39c12', '#e74c3c', '#9b59b6', '#1abc9c'
+            ]
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: { boxWidth: 12 }
+            }
+        }
+    }
+});
+
+const productsCtx = document.getElementById('productsChart').getContext('2d');
+new Chart(productsCtx, {
+    type: 'bar',
+    data: {
+        labels: chartData.top_products.map(p => p.name.substring(0, 15) + '...'),
+        datasets: [{
+            label: 'Formations',
+            data: chartData.top_products.map(p => p.count),
+            backgroundColor: 'rgba(46, 204, 113, 0.8)',
+            borderRadius: 6
+        }]
+    },
+    options: {
+        responsive: true,
+        indexAxis: 'y',
+        plugins: {
+            legend: { display: false }
+        },
+        scales: {
+            x: { beginAtZero: true, ticks: { stepSize: 1 } }
+        }
+    }
+});
+</script>
+{% endblock %}

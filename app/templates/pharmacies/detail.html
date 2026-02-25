@@ -1,0 +1,204 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ pharmacy.name }} - Dermo-CRM{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-clinic-medical text-primary"></i> {{ pharmacy.name }}</h2>
+            <p class="text-muted mb-0">
+                <i class="fas fa-map-marker-alt"></i> {{ pharmacy.address or 'Adresse non definie' }}, {{ pharmacy.city or '' }}
+                {% if pharmacy.referent %}
+                <span class="ms-3"><i class="fas fa-user"></i> Referent: {{ pharmacy.referent.name }}</span>
+                {% endif %}
+            </p>
+        </div>
+        <div>
+            <a href="{{ url_for('pharmacies.edit', id=pharmacy.id) }}" class="btn btn-warning">
+                <i class="fas fa-edit"></i> Modifier
+            </a>
+            <a href="{{ url_for('pharmacies.index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Retour
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card shadow mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> Informations</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-borderless">
+                        <tr>
+                            <td><i class="fas fa-building text-muted"></i> Type</td>
+                            <td class="text-end"><span class="badge bg-secondary">{{ pharmacy.type or 'Non defini' }}</span></td>
+                        </tr>
+                        <tr>
+                            <td><i class="fas fa-phone text-muted"></i> Telephone</td>
+                            <td class="text-end">{{ pharmacy.phone or '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td><i class="fas fa-envelope text-muted"></i> Email</td>
+                            <td class="text-end">{{ pharmacy.email or '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td><i class="fas fa-map-pin text-muted"></i> Code postal</td>
+                            <td class="text-end">{{ pharmacy.postal_code or '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td><i class="fas fa-globe text-muted"></i> Region</td>
+                            <td class="text-end">{{ pharmacy.region or '-' }}</td>
+                        </tr>
+                        {% if pharmacy.latitude and pharmacy.longitude %}
+                        <tr>
+                            <td><i class="fas fa-location-arrow text-muted"></i> GPS</td>
+                            <td class="text-end">
+                                <small class="text-muted">{{ pharmacy.latitude }}, {{ pharmacy.longitude }}</small>
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                    
+                    {% if pharmacy.notes %}
+                    <hr>
+                    <h6><i class="fas fa-sticky-note"></i> Notes</h6>
+                    <p class="text-muted">{{ pharmacy.notes }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card shadow mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-users"></i> Contacts ({{ contacts|length }})</h5>
+                </div>
+                <div class="card-body">
+                    {% if contacts %}
+                        {% for contact in contacts %}
+                        <div class="d-flex justify-content-between align-items-start mb-3 {% if not loop.last %}border-bottom pb-2{% endif %}">
+                            <div>
+                                <h6 class="mb-1">
+                                    {{ contact.name }}
+                                    {% if contact.is_primary %}
+                                    <span class="badge bg-primary badge-sm">Principal</span>
+                                    {% endif %}
+                                </h6>
+                                <small class="text-muted">{{ contact.role or 'Non defini' }}</small><br>
+                                {% if contact.phone %}
+                                <small><i class="fas fa-phone text-success"></i> {{ contact.phone }}</small><br>
+                                {% endif %}
+                                {% if contact.email %}
+                                <small><i class="fas fa-envelope text-info"></i> {{ contact.email }}</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted text-center mb-0">Aucun contact enregistre</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+            {% if pharmacy.latitude and pharmacy.longitude %}
+            <div class="card shadow mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-map"></i> Localisation</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div id="map" style="height: 300px; width: 100%;"></div>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="card shadow">
+                <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-calendar-check"></i> Visites ({{ visits|length }})</h5>
+                    <a href="{{ url_for('visits.create', pharmacy_id=pharmacy.id) }}" class="btn btn-sm btn-success">
+                        <i class="fas fa-plus"></i> Nouvelle visite
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if visits %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Agent</th>
+                                    <th>Duree</th>
+                                    <th>Score</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for visit in visits %}
+                                <tr>
+                                    <td>{{ visit.visit_date.strftime('%d/%m/%Y') if visit.visit_date else '-' }}</td>
+                                    <td>
+                                        <span class="badge bg-{{ 'primary' if visit.visit_type == 'planifiee' else 'info' if visit.visit_type == 'ponctuelle' else 'secondary' }}">
+                                            {{ visit.visit_type or 'Non defini' }}
+                                        </span>
+                                    </td>
+                                    <td>{{ visit.user.full_name if visit.user else '-' }}</td>
+                                    <td>{{ visit.duration or '-' }} min</td>
+                                    <td>
+                                        {% if visit.quality_score %}
+                                            <span class="badge bg-{{ 'success' if visit.quality_score >= 4 else 'warning' if visit.quality_score >= 3 else 'danger' }}">
+                                                {{ visit.quality_score }}/5
+                                            </span>
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{{ url_for('visits.detail', id=visit.id) }}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                        <p class="text-muted text-center mb-0">Aucune visite enregistree</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+{% if pharmacy.latitude and pharmacy.longitude %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if pharmacy.latitude and pharmacy.longitude %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const lat = {{ pharmacy.latitude }};
+        const lng = {{ pharmacy.longitude }};
+        
+        const map = L.map('map').setView([lat, lng], 15);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: 'OpenStreetMap contributors'
+        }).addTo(map);
+        
+        L.marker([lat, lng]).addTo(map)
+            .bindPopup('<b>{{ pharmacy.name }}</b><br>{{ pharmacy.address or "" }}')
+            .openPopup();
+    });
+</script>
+{% endif %}
+{% endblock %}

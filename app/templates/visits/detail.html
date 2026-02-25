@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+
+{% block title %}Visite du {{ visit.visit_date.strftime('%d/%m/%Y') if visit.visit_date else 'Date non definie' }} - Dermo-CRM{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2>
+                <i class="fas fa-calendar-check text-primary"></i> 
+                Visite du {{ visit.visit_date.strftime('%d/%m/%Y') if visit.visit_date else 'Date non definie' }}
+            </h2>
+            <p class="text-muted mb-0">
+                <i class="fas fa-clinic-medical"></i> 
+                <a href="{{ url_for('pharmacies.detail', id=visit.pharmacy.id) }}">{{ visit.pharmacy.name }}</a>
+                {% if visit.pharmacy.city %}
+                - {{ visit.pharmacy.city }}
+                {% endif %}
+            </p>
+        </div>
+        <div>
+            <a href="{{ url_for('visits.edit', id=visit.id) }}" class="btn btn-warning">
+                <i class="fas fa-edit"></i> Modifier
+            </a>
+            <a href="{{ url_for('visits.index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Retour
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card shadow mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> Details</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-borderless">
+                        <tr>
+                            <td>Date</td>
+                            <td class="text-end"><strong>{{ visit.visit_date.strftime('%d/%m/%Y') if visit.visit_date else '-' }}</strong></td>
+                        </tr>
+                        <tr>
+                            <td>Heure</td>
+                            <td class="text-end">{{ visit.visit_time.strftime('%H:%M') if visit.visit_time else '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td>Duree</td>
+                            <td class="text-end">{{ visit.duration or '-' }} min</td>
+                        </tr>
+                        <tr>
+                            <td>Type</td>
+                            <td class="text-end">
+                                <span class="badge bg-primary">{{ visit.visit_type or 'Non defini' }}</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Agent</td>
+                            <td class="text-end">{{ visit.user.full_name if visit.user else '-' }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-8">
+            {% if visit.objectives %}
+            <div class="card shadow mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-bullseye"></i> Objectifs</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-0">{{ visit.objectives }}</p>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if visit.report %}
+            <div class="card shadow mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><i class="fas fa-clipboard-list"></i> Compte rendu</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-0" style="white-space: pre-line;">{{ visit.report }}</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

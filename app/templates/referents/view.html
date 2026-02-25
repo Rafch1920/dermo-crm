@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ referent.name }} - Dermo-CRM{% endblock %}
+{% block page_title %}{{ referent.name }}{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <a href="{{ url_for('referents.index') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Retour aux referents
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card" style="border-top: 5px solid {{ referent.color }};">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">Informations</h5>
+            </div>
+            <div class="card-body">
+                <p><strong><i class="bi bi-person"></i> Nom:</strong> {{ referent.name }}</p>
+                <p><strong><i class="bi bi-geo-alt"></i> Zone:</strong> {{ referent.zone or 'Non defini' }}</p>
+                <p><strong><i class="bi bi-envelope"></i> Email:</strong> {{ referent.email or '-' }}</p>
+                <p><strong><i class="bi bi-telephone"></i> Telephone:</strong> {{ referent.phone or '-' }}</p>
+                <p><strong><i class="bi bi-shop"></i> Pharmacies:</strong> {{ pharmacies|length }}</p>
+                <p><strong><i class="bi bi-bullseye"></i> Objectif:</strong> {{ referent.target_pharmacies or 0 }}</p>
+            </div>
+            <div class="card-footer">
+                <a href="{{ url_for('referents.edit', id=referent.id) }}" class="btn btn-warning btn-sm">
+                    <i class="bi bi-pencil"></i> Modifier
+                </a>
+                <form method="POST" action="{{ url_for('referents.delete', id=referent.id) }}" class="d-inline" onsubmit="return confirm('Supprimer ce referent ?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-danger btn-sm">
+                        <i class="bi bi-trash"></i> Supprimer
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Pharmacies assignees ({{ pharmacies|length }})</h5>
+            </div>
+            <div class="card-body p-0">
+                {% if pharmacies %}
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Nom</th>
+                            <th>Ville</th>
+                            <th>Telephone</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for pharmacy in pharmacies %}
+                        <tr>
+                            <td>{{ pharmacy.name }}</td>
+                            <td>{{ pharmacy.city or '-' }}</td>
+                            <td>{{ pharmacy.phone or '-' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="p-3 text-center text-muted">
+                    Aucune pharmacy assignee a ce referent
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+
+{% block title %}Campagnes - Dermo-CRM{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-bullhorn text-primary"></i> Campagnes</h2>
+        <a href="{{ url_for('campaigns.new') }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Nouvelle campagne
+        </a>
+    </div>
+
+    <div class="row">
+        {% for data in campaigns_data %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">{{ data.campaign.name }}</h5>
+                    <span class="badge bg-{{ 'success' if data.campaign.status == 'active' else 'warning' if data.campaign.status == 'paused' else 'secondary' if data.campaign.status == 'draft' else 'dark' }}">
+                        {{ data.campaign.status }}
+                    </span>
+                </div>
+                <div class="card-body">
+                    <!-- Barre de progression -->
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="fw-bold">Progression</span>
+                            <span class="text-muted">{{ data.completed }}/{{ data.total }} pharmacies</span>
+                        </div>
+                        <div class="progress" style="height: 25px;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                                 role="progressbar" 
+                                 style="width: {{ data.progress }}%"
+                                 aria-valuenow="{{ data.progress }}" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="100">
+                                {{ data.progress }}%
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Dates -->
+                    {% if data.campaign.start_date and data.campaign.end_date %}
+                    <p class="text-muted mb-2">
+                        <i class="fas fa-calendar-alt"></i> 
+                        {{ data.campaign.start_date.strftime('%d/%m/%Y') }} - {{ data.campaign.end_date.strftime('%d/%m/%Y') }}
+                    </p>
+                    {% endif %}
+                    
+                    <!-- Description courte -->
+                    {% if data.campaign.description %}
+                    <p class="text-muted small mb-0">
+                        {{ data.campaign.description[:100] }}{% if data.campaign.description|length > 100 %}...{% endif %}
+                    </p>
+                    {% endif %}
+                </div>
+                <div class="card-footer bg-transparent">
+                    <a href="{{ url_for('campaigns.view', id=data.campaign.id) }}" class="btn btn-sm btn-primary w-100">
+                        <i class="fas fa-eye"></i> Voir details
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="col-12 text-center py-5">
+            <i class="fas fa-bullhorn fa-4x text-muted mb-3"></i>
+            <h4 class="text-muted">Aucune campagne</h4>
+            <a href="{{ url_for('campaigns.new') }}" class="btn btn-primary mt-3">
+                <i class="fas fa-plus"></i> Creer une campagne
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
