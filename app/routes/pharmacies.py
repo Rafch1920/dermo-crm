@@ -10,6 +10,7 @@ import json
 from app import db
 from app.models import Pharmacy, Contact, Agent, Referent, Visit, Attachment
 from app.utils.geo_utils import geocode_address
+from app.utils.mailgun import send_email  # AJOUT: Import Mailgun
 
 bp = Blueprint('pharmacies', __name__)
 
@@ -254,7 +255,55 @@ def create():
         
         db.session.commit()
         
-        flash(f'Pharmacie "{name}" creee avec succes.', 'success')
+        # =====================================================
+        # ENVOI EMAIL VIA MAILGUN (NOUVEAU)
+        # =====================================================
+        try:
+            # Récupère le référent pour l'email
+            referent = Referent.query.get(referent_id) if referent_id else None
+            
+            # Prépare le contenu de l'email
+            email_subject = f'Nouvelle pharmacie ajoutée: {name}'
+            email_body = f"""
+Bonjour,
+
+Une nouvelle pharmacie a été ajoutée au CRM Dermo:
+
+Nom: {name}
+Type: {type_}
+Adresse: {address}, {postal_code} {city}
+Téléphone: {phone}
+Email: {email}
+
+Coordonnées GPS: {latitude}, {longitude}
+
+Ajoutée par: {current_user.full_name or current_user.username}
+
+Cordialement,
+Dermo-CRM
+            """
+            
+            # Détermine le destinataire (référent ou email par défaut)
+            recipient = referent.email if referent and referent.email else pharmacy.email
+            
+            if recipient:
+                success, msg = send_email(
+                    to=recipient,
+                    subject=email_subject,
+                    body=email_body
+                )
+                
+                if success:
+                    flash(f'Pharmacie "{name}" créée avec succès. Email envoyé à {recipient}.', 'success')
+                else:
+                    flash(f'Pharmacie "{name}" créée avec succès. (Email non envoyé: {msg})', 'warning')
+            else:
+                flash(f'Pharmacie "{name}" créée avec succès. (Pas d\'email destinataire)', 'success')
+                
+        except Exception as e:
+            # En cas d'erreur d'envoi, on ne bloque pas la création
+            flash(f'Pharmacie "{name}" créée avec succès. (Erreur email: {str(e)})', 'warning')
+        
         return redirect(url_for('pharmacies.index'))
     
     referents = Referent.query.filter_by(is_active=True).order_by(Referent.name).all()
