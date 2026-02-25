@@ -11,7 +11,8 @@ class DevelopmentConfig(Config):
     
 class ProductionConfig(Config):
     DEBUG = False
-    # Utilise SQLite même en production (gratuit)
+    # Utilise /tmp pour Render Free (accessible en écriture)
+    # Ou garde le dossier courant si ça fonctionne
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///dermo_crm.db'
     
 config_dict = {
